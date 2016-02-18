@@ -9,7 +9,8 @@
 
 %% Setup Paths
 analysisBasePath = '....'; % Insert path to folder for saving analysis
-exampleDataPath = '....\MERFISH_Examples\'; % Insert path for analysis of data
+exampleDataPath = '....\MERFISH_Examples\'; % Insert path to example data 
+% Example data can be downloaded from http://zhuang.harvard.edu/merfish/MERFISHData/MERFISH_Examples.zip
 
 %% Setup parameters
 % Setup parameters for parsing the name of image files
@@ -26,7 +27,7 @@ parameters.wordConstMethod = 'perLocalization'; % A flag to specify the word con
 
 % Setup parameters for decoding data
 parameters.codebookPath = [exampleDataPath 'codebook\codebook.fasta'];           % Insert path to the codebook
-parameters.exactMap = CodebookToMap(parameters.codebook, ...
+parameters.exactMap = CodebookToMap(parameters.codebookPath, ...
         'keyType', 'binStr');
 parameters.errCorrFunc = @SECDEDCorrectableWords;   % The function used to generate a map for correctable words
 parameters.FPKMData = LoadByteStream(...
@@ -52,7 +53,7 @@ parameters.reportsToGenerate(end+1,:) = {'compositeHybImage', 'off'};
 parameters.reportsToGenerate(end+1,:) = {'hamming1DReportAllGenes', 'off'};
 parameters.reportsToGenerate(end+1,:) = {'bitFlipProbabilitiesAverage', 'off'};
 parameters.reportsToGenerate(end+1,:) = {'bitFlipProbabilitiesAllGenes', 'off'};
-parameters.reportsToGenerate(end+1,:) = {'hammingSphereReport', 'off'};
+parameters.reportsToGenerate(end+1,:) = {'confidenceRatioReport', 'off'};
 
 parameters.overwrite = true;                % Overwrite existing files
 parameters.figFormats = {'fig', 'png'};     % Output formats
