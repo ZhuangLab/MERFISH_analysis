@@ -8,8 +8,13 @@
 % Copyright Presidents and Fellows of Harvard College, 2016.
 
 %% Setup Paths
-analysisBasePath = '....'; % Insert path to folder for saving analysis
-exampleDataPath = '....\MERFISH_Examples\'; % Insert path for analysis of data
+merfishRelease = 'C:\Users\Alistair\Documents\Research\Projects\MERFISH-Release\';
+analysisBasePath = [merfishRelease,'MERFISH-data\MERFISH_Examples\analysis_examples\']; % Insert path to folder for saving analysis
+exampleDataPath = [merfishRelease,'\MERFISH-data\MERFISH_Examples\']; % Insert path for analysis of data
+
+
+% Add all MERFISH functions to your filepath (if not already active):
+addpath(genpath([merfishRelease,'MERFISH-public\']))
 
 %% Setup parameters
 % Setup parameters for parsing the name of image files
@@ -26,7 +31,7 @@ parameters.wordConstMethod = 'perLocalization'; % A flag to specify the word con
 
 % Setup parameters for decoding data
 parameters.codebookPath = [exampleDataPath 'codebook\codebook.fasta'];           % Insert path to the codebook
-parameters.exactMap = CodebookToMap(parameters.codebook, ...
+parameters.exactMap = CodebookToMap(parameters.codebookPath, ...
         'keyType', 'binStr');
 parameters.errCorrFunc = @SECDEDCorrectableWords;   % The function used to generate a map for correctable words
 parameters.FPKMData = LoadByteStream(...
