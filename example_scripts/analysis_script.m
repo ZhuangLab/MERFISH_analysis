@@ -10,6 +10,8 @@
 %% Setup Paths
 % UPDATE these paths to point to your data (or downloaded example data) and
 % to a folder where you wish to save the output of the analysis.
+% Example data can be downloaded from http://zhuang.harvard.edu/merfish/MERFISHData/MERFISH_Examples.zip
+
 merfishRelease = 'C:\Users\Alistair\Documents\Research\Projects\MERFISH-Release\'; 
 exampleDataPath = [merfishRelease,'MERFISH_Examples\']; % Insert path for analysis of data (e.g. where you saved the example data).
 analysisBasePath = [merfishRelease,'MERFISH-Demo-Output\']; % Insert path to folder for saving analysis
@@ -58,7 +60,7 @@ parameters.reportsToGenerate(end+1,:) = {'compositeHybImage', 'off'};
 parameters.reportsToGenerate(end+1,:) = {'hamming1DReportAllGenes', 'off'};
 parameters.reportsToGenerate(end+1,:) = {'bitFlipProbabilitiesAverage', 'off'};
 parameters.reportsToGenerate(end+1,:) = {'bitFlipProbabilitiesAllGenes', 'off'};
-parameters.reportsToGenerate(end+1,:) = {'hammingSphereReport', 'off'};
+parameters.reportsToGenerate(end+1,:) = {'confidenceRatioReport', 'off'};
 
 parameters.overwrite = true;                % Overwrite existing files
 parameters.figFormats = {'fig', 'png'};     % Output formats
