@@ -53,7 +53,7 @@ defaults(end+1,:) = {'fiducialWarp2Hyb1', 'boolean', false};
 defaults(end+1,:) = {'maxDtoCentroid', 'nonnegative', 1};   % Distance between spots in different rounds
 
 % Parameters for decoding words
-defaults(end+1,:) = {'codebookPath', 'filePath', []};       % Path to codebook
+defaults(end+1,:) = {'codebookPath', 'filePath', ''};       % Path to codebook
 defaults(end+1,:) = {'codebook', 'struct', []};             % Codebook structure
 defaults(end+1,:) = {'exactMap', 'map', []};                % containers.Map for decoding exact matches
 defaults(end+1,:) = {'correctableMap', 'map', []};          % containers.Map for decoding correctable matches
@@ -63,7 +63,7 @@ defaults(end+1,:) = {'keyType', {'int', 'binStr'}, ...      % Display type for b
     'binStr'};
 
 % Parameters for progress reports and intermediate figures
-defaults(end+1,:) = {'savePath', 'fileDir', []};            % Path to save incidental figures
+defaults(end+1,:) = {'savePath', 'fileDir', ''};            % Path to save incidental figures
 defaults(end+1,:) = {'reportsToGenerate', 'cell', ...       % List of flags for generating different reports
     cell(0,2)}; 
 defaults(end+1,:) = {'verbose', 'boolean', false};          % Display progress?
@@ -245,7 +245,7 @@ for i=cellIDs
     % Load and transfer information on the corresponding dax
     % ---------------------------------------------------------------------
     imageData = TransferInfoFileFields(imageData, 'parameters', parameters);
-    fiducialData = TransferInfoFileFields(fiducialData, 'parameters', parameters);
+%    fiducialData = TransferInfoFileFields(fiducialData, 'parameters', parameters);
     
     % ---------------------------------------------------------------------
     % Generate a measure of focus lock quality for all images

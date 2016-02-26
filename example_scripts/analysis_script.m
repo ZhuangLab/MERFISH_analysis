@@ -8,10 +8,11 @@
 % Copyright Presidents and Fellows of Harvard College, 2016.
 
 %% Setup Paths
-merfishRelease = 'C:\Users\Alistair\Documents\Research\Projects\MERFISH-Release\';
-analysisBasePath = [merfishRelease,'MERFISH-data\MERFISH_Examples\analysis_examples\']; % Insert path to folder for saving analysis
-exampleDataPath = [merfishRelease,'\MERFISH-data\MERFISH_Examples\']; % Insert path for analysis of data
-
+% UPDATE these paths to point to your data (or downloaded example data) and
+% to a folder where you wish to save the output of the analysis.
+merfishRelease = 'C:\Users\Alistair\Documents\Research\Projects\MERFISH-Release\'; 
+exampleDataPath = [merfishRelease,'MERFISH_Examples\']; % Insert path for analysis of data (e.g. where you saved the example data).
+analysisBasePath = [merfishRelease,'MERFISH-Demo-Output\']; % Insert path to folder for saving analysis
 
 % Add all MERFISH functions to your filepath (if not already active):
 addpath(genpath([merfishRelease,'MERFISH-public\']))
