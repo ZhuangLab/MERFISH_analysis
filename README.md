@@ -32,6 +32,6 @@ Several example scripts are provided to illustrate how to perform a series of ba
 2. code_construction_script: This script illustrates the construction of different binary encoding schemes.
 
 ## Questions
-Contact Jeffrey Moffitt (lmoffitt at mcb.harvard.edu) or Alistair Boettiger (boettiger at fas.harvard.edu).
+Contact Xiaowei Zhuang (zhuang at chemistry.harvard.edu), Jeffrey Moffitt (lmoffitt at mcb.harvard.edu), or Alistair Boettiger (boettiger at fas.harvard.edu).
 
 
