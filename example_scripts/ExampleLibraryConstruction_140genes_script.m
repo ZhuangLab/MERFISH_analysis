@@ -57,16 +57,21 @@
 %    primer sequences 2 and 3 (the 20 mers at each end).  
 % -------------------------------------------------------------------------
 
-
-% Add all MERFISH functions to your filepath (if not already active):
-addpath(genpath('C:\Users\Alistair\Documents\Research\Projects\MERFISH-Release\MERFISH-public\'))
-
-% Tell matlab where to find OliogArray
-oligoArrayExe = 'C:\Users\Alistair\Documents\Research\Software\OligoArray\OligoArray2.jar'; % UPDATE THIS
+% -------------------------------------------------------------------------
+% Run instructions: 
+% 1) Update the paths in MERFISH_analysis\startup\merfish_startup.m
+% 2) Run this script to configure paths
+% merfish_startup defines several paths that are needed below: 
+% MERFISHAnalysisPath -- the path to the MERFISH_analysis code
+% oligoArrayExe -- path to the OligoArray2.1 jar file
+% legacyBLASTPath -- path to the legacy BLAST functions (needed for
+% OligoArray)
+% oligoArrayAuxPath -- path to the companion package OligoArrayAux
 
 % Specify the location of the target sequence data
-exampleData = 'C:\Users\Alistair\Documents\Research\Projects\MERFISH-Release\MERFISH-data\MERFISH_Examples\';  % UPDATE THIS 
-dataFolder = [exampleData,'probe_construction_data\'];
+exampleDataPath = [MERFISHAnalysisPath,'MERFISH_Examples\']; % This path can be changed if these data were saved elsewhere
+
+dataFolder = [exampleDataPath,'probe_construction_data\'];
 geneFasta = [dataFolder,'TargetGeneSeqs.fasta'];  % Download our demo sequences or choose your own.  
 blastLib =  [dataFolder,'TargetGeneSeqs.fasta']; % Download our demo sequences or choose your own.  
 % If there are additional sequences you want to ensure do not capture your probes, you can add these 
@@ -74,11 +79,14 @@ blastLib =  [dataFolder,'TargetGeneSeqs.fasta']; % Download our demo sequences o
 % to design probes for them.
 
 % Specify a folder to save the ouptut data in
-saveFolder = [exampleData,'probe_construction_output\'];
+saveFolder = [exampleDataPath,'probe_construction_output\'];
+if ~exist(saveFolder)
+    mkdir(saveFolder);
+end
 
 timeRun = tic;
 % Build a BLAST database for OligoArray to use based on the fasta file 
-BuildBLASTlib(blastLib,'legacy',true);
+BuildBLASTlib(blastLib,'legacy',true,'blastPath',[legacyBLASTPath '\']);
 
 [oligoArrayCommand, savePath] = OligoArrayCmd('savePath',saveFolder,...   'saveDir',saveFolder,... 
     'minTm',70,...                      % Minimum Tm of probe for its target
@@ -93,6 +101,13 @@ BuildBLASTlib(blastLib,'legacy',true);
 
 % Read in the fasta file containing the genes for which we want to design probes. 
 geneList = fastaread(geneFasta);
+
+% Append a command to the oligo array command to set the system paths
+% (required for oligo array to know where to find blast and OligoArrayAux
+setPathCommand = ['PATH=' legacyBLASTPath ';' oligoArrayAuxPath ';%PATH%; & '];
+%setPathCommand = ['PATH=' legacyBLASTPath ';' oligoArrayAuxPath ';C:\ProgramData\Oracle\Java\javapath & '];
+
+oligoArrayCommand = [setPathCommand oligoArrayCommand];
 
 BatchLaunchOligoArray(oligoArrayCommand,geneList,...
     'batchsize',20,... % max number of genes to launch at once (If you run into CPU problems, set this to less than the number of cores you have).
