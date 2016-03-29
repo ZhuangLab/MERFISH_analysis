@@ -21,7 +21,8 @@ This software requires the following software packages.
 ## Installation Instructions
 
 1. Clone the matlab-storm and storm-analysis projects and install.
-2. Create or modify a matlab startup script to define all necessary paths for matlab-storm. See the instructions [here](https://github.com/ZhuangLab/matlab-storm/blob/master/README.md).
+2. Create or modify a matlab startup script to define all necessary paths for matlab-storm. See the instructions [here](https://github.com/ZhuangLab/matlab-storm/blob/master/README.md). 
+An example script is also provided: startup\merfish_startup
 3. Install the necessary dependencies for export-fig. Instructions can be found [here](https://github.com/altmany/export_fig).
 
 ## Examples
