@@ -8,3 +8,8 @@
 ## export_fig
 #################
 .ignore/
+
+#################
+## Example MERFISH data
+#################
+MERFISH_Examples/

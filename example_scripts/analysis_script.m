@@ -7,17 +7,23 @@
 % -------------------------------------------------------------------------
 % Copyright Presidents and Fellows of Harvard College, 2016.
 
+%% Running this script
+% First, make sure all of the paths are properly configured in the script:
+% startup\merfish_startup.m. 
+% Second, run merfish_startup.m to configure paths. 
+% Third, change the paths to the example data below. 
+% Fourth, download example data from
+% http://zhuang.harvard.edu/merfish/MERFISHData/MERFISH_Examples.zip. Place
+% the unzipped folder in the same directory as the MERFISH_analysis
+% software.
+
 %% Setup Paths
 % UPDATE these paths to point to your data (or downloaded example data) and
 % to a folder where you wish to save the output of the analysis.
-% Example data can be downloaded from http://zhuang.harvard.edu/merfish/MERFISHData/MERFISH_Examples.zip
 
-merfishRelease = 'C:\Users\Alistair\Documents\Research\Projects\MERFISH-Release\'; 
-exampleDataPath = [merfishRelease,'MERFISH_Examples\']; % Insert path for analysis of data (e.g. where you saved the example data).
-analysisBasePath = [merfishRelease,'MERFISH-Demo-Output\']; % Insert path to folder for saving analysis
-
-% Add all MERFISH functions to your filepath (if not already active):
-addpath(genpath([merfishRelease,'MERFISH-public\']))
+% matlabMERFISHPath is defined in merfish_startup
+exampleDataPath = [MERFISHAnalysisPath,'MERFISH_Examples\']; % This path can be changed if these data were saved elsewhere
+analysisBasePath = [exampleDataPath,'MERFISH_Demo_Output\']; % This path can be changed to change the location where analysis will be saved
 
 %% Setup parameters
 % Setup parameters for parsing the name of image files
