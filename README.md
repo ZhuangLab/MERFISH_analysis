@@ -34,3 +34,5 @@ Several example scripts are provided to illustrate how to perform a series of ba
 Contact Jeffrey Moffitt (lmoffitt at mcb.harvard.edu) or Alistair Boettiger (boettiger at fas.harvard.edu).
 
 
+## Updates
+* 2016-07-16, replaced TargetGeneSeqs.fasta in Example MERFISH Data at [http://zhuang.harvard.edu/merfish/](http://zhuang.harvard.edu/merfish/). Previous file listed concatenation of probes, not the sequences of specific isoforms.  
