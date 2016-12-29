@@ -39,7 +39,8 @@ Several example scripts are provided to illustrate how to perform a series of ba
 3. library_design_example: This script illustrates the construction of a MERFISH probe library. It requires [example data](http://zhuang.harvard.edu/merfish/MERFISHData/MERFISH_Examples2.zip).
 
 ## Updates
-1. (December 2016) A more computationally efficient pipeline for the design and construction of MERFISH probes is now included. The functions and example scripts associated with the older pipeline are still available but have been moved to folders named 'deprecated'. 
+1. (December 2016) A more computationally efficient pipeline for the design and construction of MERFISH probes is now included. 
+The functions and example scripts associated with the older pipeline are still available but have been moved to folders named 'deprecated'. 
 
 ## Questions
 Contact Xiaowei Zhuang (zhuang at chemistry.harvard.edu) or Jeffrey Moffitt (lmoffitt at mcb.harvard.edu).
