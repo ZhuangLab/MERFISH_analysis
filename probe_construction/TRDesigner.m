@@ -7,9 +7,9 @@ classdef TRDesigner < handle
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
-% May 2, 2015
+% April 2018
 %--------------------------------------------------------------------------
-% Copyright Presidents and Fellows of Harvard College, 2016.
+% Copyright Presidents and Fellows of Harvard College, 2018.
 %--------------------------------------------------------------------------
 
 % -------------------------------------------------------------------------
@@ -801,7 +801,7 @@ methods
         defaults(end+1,:) = {'probeConc', 'positive', 5e-9};
         defaults(end+1,:) = {'OTTables', 'cell', {}};
         defaults(end+1,:) = {'includeSequence', 'boolean', true};
-        defaults(end+1,:) = {'threePrimeSpace', 'nonnegative', 0};
+        defaults(end+1,:) = {'threePrimeSpace', 'integer', 0};
         defaults(end+1,:) = {'removeForbiddenSeqs', 'boolean', false};
         
         % Parse variable inputs
@@ -811,6 +811,16 @@ methods
         % Get internal indices for the requested transcripts
         % -------------------------------------------------------------------------
         inds = obj.transcriptome.GetInternalInds('parameters', parameters);
+        
+        % -------------------------------------------------------------------------
+        % Handle case of no valid requested transcripts
+        % -------------------------------------------------------------------------
+        if isempty(inds)
+            warning('matlabFunctions:noValidEntries', ...
+                'None of the requested entries were found');
+            targetRegions = TargetRegions();
+            return;
+        end
         
         % -------------------------------------------------------------------------
         % Initialize variables for loops
