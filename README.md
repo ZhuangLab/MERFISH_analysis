@@ -1,9 +1,7 @@
 # MERFISH_analysis
 This project contains a series of matlab functions for the analysis of MERFISH as described 
 in the publication [*Spatially resolved, highly multiplexed RNA profiling in single cells*](http://www.ncbi.nlm.nih.gov/pubmed/25858977) 
-as well as the publication 
-[*High-throughput single-cell gene-expression profiling with multiplexed error-robust fluorescence in situ hybridization*]
-(https://www.ncbi.nlm.nih.gov/pubmed/27625426).
+as well as the publication [*High-throughput single-cell gene-expression profiling with multiplexed error-robust fluorescence in situ hybridization*](https://www.ncbi.nlm.nih.gov/pubmed/27625426).
 
 Example data and analysis results can be downloaded from the [MERFISH page](http://zhuang.harvard.edu/merfish/). 
 
