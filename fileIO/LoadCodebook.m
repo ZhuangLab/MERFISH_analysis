@@ -18,9 +18,10 @@ function [codebook, header, parameters] = LoadCodebook(codebookPath, varargin)
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
-% March 13, 2016
+% September 21, 2017
 %--------------------------------------------------------------------------
-% Copyright Presidents and Fellows of Harvard College, 2016.
+% Copyright Presidents and Fellows of Harvard College, 2018.
+%--------------------------------------------------------------------------
 
 % -------------------------------------------------------------------------
 % Default variables
@@ -70,8 +71,7 @@ while ~done
     stringParts = cellfun(@strtrim, stringParts, 'UniformOutput', false);
     
     % If the line is name, id, barcode, then the header portion of the
-    % codebook has been read
-    if length(stringParts) == 3 && isempty(setdiff(stringParts, {'name', 'id', 'barcode'}));
+    if isempty(setdiff({'name', 'id', 'barcode'}, stringParts))
         done = true;
         break;
     end

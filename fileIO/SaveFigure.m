@@ -27,7 +27,9 @@ function [savedFilePaths, parameters] = SaveFigure(figHandle, varargin)
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
-% April 8, 2014
+% September 21, 2017
+%--------------------------------------------------------------------------
+% Copyright Presidents and Fellows of Harvard College, 2018.
 %--------------------------------------------------------------------------
 % Dependencies:
 %   This function uses the export_fig package
@@ -38,7 +40,6 @@ function [savedFilePaths, parameters] = SaveFigure(figHandle, varargin)
 %   pass false with the 'useExportFig' flag.
 %   Update: export_fig now comes from https://github.com/ojwoodford/export_fig
 %--------------------------------------------------------------------------
-% Copyright Presidents and Fellows of Harvard College, 2016.
 
 % ------------------------------------------------------------------------
 % Define default values
@@ -49,7 +50,7 @@ global figureSavePath;
 % Default variables
 % -------------------------------------------------------------------------
 defaults = cell(0,3);
-defaults(end+1,:) = {'addGit', 'boolean', false}; % Path to codebook
+defaults(end+1,:) = {'addGit', 'boolean', false};
 defaults(end+1,:) = {'gitState', 'struct', []}; 
 defaults(end+1,:) = {'name', 'string', []};
 defaults(end+1,:) = {'overwrite', 'boolean', false};
@@ -57,7 +58,7 @@ defaults(end+1,:) = {'verbose', 'boolean', true};
 defaults(end+1,:) = {'formats', 'cell', {'fig'}};
 defaults(end+1,:) = {'appendFormats', 'cell', []};
 defaults(end+1,:) = {'useExportFig', 'boolean', true};
-defaults(end+1,:) = {'subFolder', 'string', ''};
+defaults(end+1,:) = {'subFolder', 'string', []};
 defaults(end+1,:) = {'makeDir', 'boolean', true}; %If a sub folder is specified, is it created if it does not exist
 defaults(end+1,:) = {'savePath', 'string', figureSavePath};
 defaults(end+1,:) = {'transparent', 'boolean', false};
@@ -76,6 +77,13 @@ if nargin < 1 || (~(ishghandle(figHandle) && strcmp(get(figHandle, 'type'), 'fig
 end
 
 % ------------------------------------------------------------------------
+% Check for empty savePath --> implies the use of the default
+% ------------------------------------------------------------------------
+if isempty(parameters.savePath)
+    parameters.savePath = figureSavePath;
+end
+
+% ------------------------------------------------------------------------
 % Check for subFolder and make if necessary
 % ------------------------------------------------------------------------
 if ~isempty(parameters.subFolder)
@@ -90,6 +98,15 @@ if ~isempty(parameters.subFolder)
         if ~status
             error('matlabFunctions:invalidPath', 'Provided subfolder path does not exist or cannot be created');
         end
+    end
+end
+
+% ------------------------------------------------------------------------
+% Check to see if the original directory exists, if makeDir is true
+% ------------------------------------------------------------------------
+if parameters.makeDir
+    if ~(exist(parameters.savePath) == 7)
+        mkdir(parameters.savePath);
     end
 end
 

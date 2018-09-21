@@ -20,9 +20,9 @@ function [savePath, parameters] = SetFigureSavePath(newPath, varargin)
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
-% April 8, 2014
+% September 21, 2017
 %--------------------------------------------------------------------------
-% Copyright Presidents and Fellows of Harvard College, 2016.
+% Copyright Presidents and Fellows of Harvard College, 2018.
 
 % ------------------------------------------------------------------------
 % Define default values

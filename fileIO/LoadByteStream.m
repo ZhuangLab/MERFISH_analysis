@@ -15,12 +15,12 @@ function [data, parameters] = LoadByteStream(filePath, varargin)
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
-% September 9, 2014
+% September 21, 2017
 %--------------------------------------------------------------------------
 % Based on
 % http://undocumentedmatlab.com/blog/serializing-deserializing-matlab-data
 %--------------------------------------------------------------------------
-% Copyright Presidents and Fellows of Harvard College, 2016.
+
 
 %--------------------------------------------------------------------------
 % Parse necessary inputs
