@@ -1,11 +1,40 @@
-MERFISH_analysis installation
-Leonardo Sepulveda, 01/18/19
-
-Below is the steps I used to install the pipeline in the Harvard cluster. It assumes that you have already installed git, anaconda3, matlab, fftw and scons in your cluster (They are called using the module load command). Besides that, I noticed that some of the files in the package need small modifications, so I copied them to the folder modifiedFunctions. You will need to replace the version that comes from git for the ones provided. 
-
-I provide a master script called runMERFISH that initializes variables and calls the main MERFISH script (MERFISHScheduler). I also provide a dataOrganization.csv file for a multi-z experiment. 
-
-I tested the pipeline and I get the same results I got with the old pipeline. 
+%--------------------------------------------------------------------------
+% MERFISH_analysis installation
+%--------------------------------------------------------------------------
+% Leonardo Sepulveda, 03/01/2019
+%
+% Below are the general steps used to install the pipeline in the Harvard 
+% RC  cluster. This installation requieres to have the following packages 
+% already installed:
+% - git
+% - anaconda3 (for python 2.7) 
+% - matlab
+% - fftw
+% - scons
+%
+% In the installation below, these packages are called with the "module 
+% load" command. 
+% 
+% The runMERFISH.m script is the main script used to launch the pipeline. 
+% It contains the paths to several files required for the analysis, and
+%  also calls the MERFISHscheduler.m script, that is the main script to 
+% run the decoding. The MERFISH_analysis/example_scripts/decoding folder 
+% also contains 3 files required to seamlessly run the pipeline: 
+% - L26E1_codebook.csv: file containing the mapping between gene names 
+%   and their barcodes for the L26 library designed to show the 
+%   performance of MERFISH in U-2 OS cells (Chen et al., Science (2015), 
+%   Moffit et al.,PNAS(2016a); Moffit et al.,PNAS(2016b)).  
+% - FPKMDataPublished.matb: File containing the expression level the 
+%   genes targeted in the L26 library, measured by RNAseq (average of 3 
+%   replicates, Moffit et al., PNAS (2016a))
+% - data_organization.csv: file containing information on the 
+%   organization of the data files, for example, the names of the files, 
+%   the frames in a multi-Z image associated to each bit for each round 
+%   of hybridization, the frames containing the images for segmentation 
+%   and image registration, etc.  
+%--------------------------------------------------------------------------
+INSTALLATION INSTRUCTIONS:
+%--------------------------------------------------------------------------
 
 % Create folders
 mkdir new_merfish_pipeline
