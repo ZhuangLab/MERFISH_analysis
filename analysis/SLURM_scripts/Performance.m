@@ -14,6 +14,9 @@ end
 if ~exist('aPath')
 	error('A normalized data path must be provided.');
 end
+if ~exist('scratchPath')
+	error('A path to scratch folder must be provided.');
+end
 
 %% Create diary
 if ~exist([nDPath 'log'], 'dir')
@@ -72,7 +75,7 @@ pc = parcluster('local');
 
 % explicitly set the JobStorageLocation to the temp directory that was
 % created in your sbatch script
-pc.JobStorageLocation = strcat('/scratch/jeffmoffitt/', getenv('SLURM_JOB_ID'))
+pc.JobStorageLocation = strcat(scratchPath, getenv('SLURM_JOB_ID'))
 
 % start the parallel pool
 p = parpool(pc, str2num(getenv('SLURM_NTASKS')))
