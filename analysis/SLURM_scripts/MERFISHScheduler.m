@@ -73,7 +73,7 @@ if ~exist('loadPythonCommand', 'var')
 	loadPythonCommand = 'module load python/2.7.14-fasrc01';
 end
 if ~exist('activateEnvironmentCommand', 'var')
-	activateEnvironmentCommand = 'source activate ENV_MOFFITT';
+	activateEnvironmentCommand = ['source activate ' merfish_ENV];
 end
 
 %% Create normalized data path if it does not exist
