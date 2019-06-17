@@ -1,5 +1,7 @@
 AIBS fork of code with modifications to support robust design of MERFISH probes. 
-Formed by Rusty Nicovich 4/18.  Continued edits to support sequential probes and mouse transcriptome sense. Key edits and notes:
+Forked by Rusty Nicovich 4/18.  Continued edits to support sequential probes and mouse transcriptome sense. 
+
+Key edits and notes:
 
 - Sequentially-probed genes (aka smELT) in same or separate panel as barcoded (aka MERFISH) genes supported.
 - Bug fix to allow large binary objects to be saved and loaded to/from disk. 
