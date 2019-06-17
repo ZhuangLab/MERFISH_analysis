@@ -1,3 +1,33 @@
+AIBS fork of code with modifications to support robust design of MERFISH probes. 
+Formed by Rusty Nicovich 4/18.  Continued edits to support sequential probes and mouse transcriptome sense. Key edits and notes:
+
+- Sequentially-probed genes (aka smELT) in same or separate panel as barcoded (aka MERFISH) genes supported.
+- Bug fix to allow large binary objects to be saved and loaded to/from disk. 
+- Support for un-sliced mouse or human transcriptome to pass through analysis.
+- Convenience edits in library_design_example to make easier to use for probe design. 
+- Tested with publicly-available mouse transcriptome and non-coding RNA files.
+- When not thresholding on any gene abundance (threshold >= 0) then *bulk sequencing is not needed* (proxy file required, but can be made from transcriptome directly). 
+
+Required inputs for given run:
+Transcriptome file (ex for mouse):
+ftp://ftp.ensembl.org/pub/release-96/fasta/mus_musculus/cdna/
+
+Non-codding RNA file (ex for mouse):
+ftp://ftp.ensembl.org/pub/release-96/fasta/mus_musculus/ncrna/
+
+Codebook file w/ gene name, isoform, and binary codes as to MERFISH +- smELT format
+./MERFISH_anlaysis/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv
+
+Readouts.fasta file
+./MERFISH_anlaysis/MERFISH_Examples2/readoutsHypothalamus.fasta
+
+Proxy bulk sequencing file (created with ./MERFISH_anlaysis/MERFISH_Examples2/makeFPKMfileFromCodebook.m0:
+./MERFISH_anlaysis/MERFISH_Examples2/Mus_musculus_proxy.fpkm_tracking
+
+-------------------------------------------------------------------------------------------
+
+Original README continues below:
+
 # MERFISH_analysis
 This project contains a series of matlab functions for the analysis of MERFISH as described 
 in the publication [*Spatially resolved, highly multiplexed RNA profiling in single cells*](http://www.ncbi.nlm.nih.gov/pubmed/25858977) 
