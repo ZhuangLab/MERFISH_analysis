@@ -8,7 +8,9 @@
 %% ------------------------------------------------------------------------
 % Setup the workspace
 %%-------------------------------------------------------------------------
-merfish_startup;
+MERFISHAnalysisPath = 'C:\Users\ScanningLabAnalysis\Documents\MATLAB\MERFISH_analysis\';
+
+
 
 %% Set up paths
 % Raw data paths
@@ -18,13 +20,20 @@ basePath = [MERFISHAnalysisPath '\MERFISH_Examples2\']; % Base path where all re
     % run this script.  These example files can be downloaded from http://zhuang.harvard.edu/merfish/MERFISHData/MERFISH_Examples2.zip
     
 rawTranscriptomeFasta = [basePath 'transcripts.fasta'];
+
+% rawTranscriptomeFasta = 'C:\Users\ScanningLabAnalysis\Documents\MATLAB\MERFISH_analysis\AIBSProbeDesign\HumanControlPanel1\Human_Control_Panel_1.rtf';
+
 fpkmPath = [basePath 'isoforms.fpkm_tracking'];
 ncRNAPath = [basePath 'Homo_sapiens.GRCh38.ncrna.fa'];
 readoutPath = [basePath 'readouts.fasta'];
-codebookPath = [basePath 'codebook.csv'];
+codebookPath = [basePath 'codebookHumansmELT.csv'];
 
 % Paths at which to save created objects
+
 analysisSavePath = SetFigureSavePath([basePath 'libraryDesign\'], 'makeDir', true);
+% % 
+% analysisSavePath = SetFigureSavePath('C:\Users\ScanningLabAnalysis\Documents\MATLAB\MERFISH_analysis\AIBSProbeDesign\HumanControlPanel1',...
+%                                         'makeDir', true);
 
 rRNAtRNAPath = [analysisSavePath 'rRNAtRNA.fa'];
 transcriptomePath = [analysisSavePath 'transcriptomeObj'];
@@ -183,10 +192,12 @@ end
 %%-------------------------------------------------------------------------
 %% Create parallel pool... speeds up the construction of the TRDesigner and the construction of libraries
 if isempty(gcp('nocreate'))
-    p = parpool(8);  % Insert a number here appropriate to the used computational resources
+    p = parpool(5);  % Insert a number here appropriate to the used computational resources
 else
     p = gcp;
 end
+
+parHold = p;
 
 %% ------------------------------------------------------------------------
 % Build Penalty Tables
@@ -331,8 +342,18 @@ if ~exist(oligosPath)
 
             % Build all possible oligos
             for p=1:tRegion.numRegions
-                % Create random orientation and selection of readouts
-                localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                
+                % smELT localReadouts enforcement
+                if sum(barcodes(i,:)) == 1
+                    localReadouts(1) = possibleReadouts;
+                    localReadouts(2).Header = '';
+                    localReadouts(2).Sequence = '';
+                    localReadouts(3).Header = '';
+                    localReadouts(3).Sequence = '';
+                else
+                    % Create random orientation and selection of readouts
+                    localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                end
 
                 if rand(1) > 0.5
                     % Create header 
@@ -415,6 +436,10 @@ else % End oligo design
 end
 
 %% Design primers -- removing those that have homology to the probes designed above
+display('Designing primers!');
+
+p = parHold;
+
 primersPath = [analysisSavePath libraryName '_possible_primers.fasta'];
 if ~exist(primersPath)
 

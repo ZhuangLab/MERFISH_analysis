@@ -118,6 +118,9 @@ methods
             end
         elseif iscell(transcriptome) && length(transcriptome) == 4 % All data were provided in a cell
             % Insert everything (but sequences)
+            
+%             assignin('base', 'transObj', transcriptome);
+            
             obj.ids = transcriptome{1};
             obj.geneNames = transcriptome{2};
             obj.abundance = transcriptome{4};
@@ -157,12 +160,25 @@ methods
                         obj.intSequences{i} = int8(nt2int(transcriptome(i).Sequence)) - 1; % 0=A, 1=C, ... >3 = not valid
                     end
                 case 'ensembl'
-                    parseFunc = @(x)regexp(x, '(?<id> gene:\S*)', 'names');
+                    parseFunc = @(x)regexp(x, '(?<id>^ENS\D+T\d+[.]\d).*(?<geneID>gene:ENS\D+G\d*[.]\d).*(?<name>gene_symbol:\S+)', 'names');
                     for i=1:length(transcriptome)
-                        parsedData = parseFunc(transcriptome(i).Header);
-                        obj.ids{i} = parsedData.id(7:end);
-                        obj.geneNames{i} = ''; % Gene name not provided in header
-                        obj.intSequences{i} = int8(nt2int(transcriptome(i).Sequence)) - 1;
+                        
+                        try
+                        
+                            parsedData = parseFunc(transcriptome(i).Header);
+                            obj.ids{i} = parsedData.id;
+    %                         obj.geneID{i} = parsedData.geneID(6:end); % Strip
+    %                         off gene 
+                            % Might be unused elsewhere, so remove here.
+                            obj.geneNames{i} = parsedData.name((numel('gene_symbol:')+1):end); 
+                            obj.intSequences{i} = int8(nt2int(transcriptome(i).Sequence)) - 1;
+                            
+                        catch 
+                            
+                            fprintf(1, 'Failed on transcriptome i = %d\n', i);
+                            assignin('base', 'parsedData', parsedData);
+                            
+                        end
                     end
             end
             if obj.verbose
@@ -348,6 +364,11 @@ methods
     function seqs = GetSequencesByName(obj, names)
         % Return all sequences for the specified name
         % seqs = obj.GetSequencesByName(names)
+        % Broken. Requires fix to return correct sequence.
+        % Does not support names with more than 1 transcript in object.
+        % If multiple transcripts assigned to name, multiple values
+        % returned by values(obj.name2Ind, names(isValid)); 
+        % generating error.
         
         % Handle a single input
         wasSingleInput = false;
@@ -357,11 +378,20 @@ methods
         end
         
         % Create sequences cell array
+        % Must be corrected to allow case where multiple sequences can share same
+        % name.
+        
         seqs = cell(1, length(names));
 
         % Find valid names
         isValid = isKey(obj.name2Ind, names);
-
+        
+        % Assign into base workspace for troubleshooting.
+        assignin('base', 'name2Ind', obj.name2Ind);
+        assignin('base', 'isValid', isValid);
+        assignin('base', 'intSequences', obj.intSequences);
+        assignin('base', 'values', values);
+        
         seqs(isValid) = obj.intSequences(cell2mat(values(obj.name2Ind, names(isValid))));
         
         % Convert sequences
@@ -396,7 +426,7 @@ methods
 
         % Find valid names
         isValid = isKey(obj.id2Ind, ids);
-
+        
         seqs(isValid) = obj.intSequences(cell2mat(values(obj.id2Ind, ids(isValid))));
 
         % Convert to nt

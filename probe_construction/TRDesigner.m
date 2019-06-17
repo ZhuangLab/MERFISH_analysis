@@ -78,6 +78,7 @@ methods
         % Parse variable input
         parameters = ParseVariableArguments(varargin, defaults, mfilename);
         
+        
         % Transfer values to object
         f = setdiff(fields(parameters), {'parallel', 'OTTableNames', 'OTTables', 'forbiddenSeqs'});
         for i=1:length(f)
@@ -85,6 +86,8 @@ methods
         end
         % Set parallel pool object
         SetParallel(obj, parameters.parallel); 
+        
+
         
         % -------------------------------------------------------------------------
         % Initialize all parameters for empty constructor case
@@ -388,7 +391,11 @@ methods
                 end
                 
                 % Calculate isoform adjusted specificity
+                
                 isoCounts = localTable.CalculatePenalty(obj.transcriptome.intSequences{s});
+                % ^ Runs into problems when more than 1 localTable for a
+                % given geneName
+                
                 obj.isoSpecificity{s} = normalization(s)./isoCounts;
                 obj.specificity{s} = isoCounts./ ... 
                     obj.specificityTable.CalculatePenalty(obj.transcriptome.intSequences{s});
@@ -806,12 +813,18 @@ methods
         
         % Parse variable inputs
         parameters = ParseVariableArguments(varargin, defaults, mfilename);
-                
+
         % -------------------------------------------------------------------------
         % Get internal indices for the requested transcripts
         % -------------------------------------------------------------------------
         inds = obj.transcriptome.GetInternalInds('parameters', parameters);
-        
+%         
+%         assignin('base', 'parameters', parameters);
+%         assignin('base', 'inds', inds);
+%         
+%         drawnow;
+%         return;
+%         
         % -------------------------------------------------------------------------
         % Handle case of no valid requested transcripts
         % -------------------------------------------------------------------------
@@ -850,6 +863,10 @@ methods
                 penalties(l,p,:) = obj.GetRegionPenalty(parameters.regionLength(l), ...
                     obj.OTTableNames{p}, 'inds', inds);
             end
+            
+            assignin('base', 'inds', inds);
+            assignin('base', 'parameters', parameters);
+            
             specificity(l,:) = obj.GetRegionSpecificity(parameters.regionLength(l), 'inds', inds);
             isoSpecificity(l,:) = obj.GetRegionIsoSpecificity(parameters.regionLength(l), 'inds', inds);
             
@@ -883,15 +900,49 @@ methods
                 end
             end
             if ~isempty(parameters.specificity)
+
                 for i=1:length(specificity)
-                    indsToKeep{l,i} = indsToKeep{l,i} & specificity{l,i} >= (parameters.specificity(1)-numPad) ...
-                        & specificity{l,i} <= (parameters.specificity(2)+numPad);
+                    if isempty(specificity{l, i})
+                        % If specificity is empty, it's because sequence is
+                        % too short to calc a penalty.  Should yield a
+                        % bunch of '0's for indsToKeep.
+                        % Guessing on what gives right length here and
+                        % conditional for 'too short'.
+                        
+                        if (numel(obj.transcriptome.intSequences{i})) < parameters.regionLength
+                            % Region is very short
+                            indsToKeep{l,i} = false;
+                            
+                        else
+                            
+                           indsToKeep{l, i} = zeros(1, numel(obj.transcriptome.intSequences{i}) - parameters.regionLength + 1, 'logical');
+                            
+                        end
+                        
+                        
+                    else
+                        indsToKeep{l,i} = indsToKeep{l,i} & specificity{l,i} >= (parameters.specificity(1)-numPad) ...
+                            & specificity{l,i} <= (parameters.specificity(2)+numPad);
+                    end
                 end
             end
             if ~isempty(parameters.isoSpecificity)
                 for i=1:length(isoSpecificity)
-                    indsToKeep{l,i} = indsToKeep{l,i} & isoSpecificity{l,i} >= (parameters.isoSpecificity(1)-numPad) ...
-                        & isoSpecificity{l,i} <= (parameters.isoSpecificity(2)+numPad);
+                        
+                        % As above, if isoSpecificity is empty, it's because sequence is
+                        % too short to calc a penalty.  Should yield a
+                        % bunch of '0's for indsToKeep.
+                    if isempty(isoSpecificity{l,i})
+                        if (numel(obj.transcriptome.intSequences{i})) < parameters.regionLength
+                            % Region is very short
+                            indsToKeep{l,i} = false;
+                        else
+                           indsToKeep{l, i} = zeros(1, numel(obj.transcriptome.intSequences{i}) - parameters.regionLength + 1, 'logical');
+                        end
+                    else
+                        indsToKeep{l,i} = indsToKeep{l,i} & isoSpecificity{l,i} >= (parameters.isoSpecificity(1)-numPad) ...
+                            & isoSpecificity{l,i} <= (parameters.isoSpecificity(2)+numPad);
+                    end
                 end
             end
             if ~isempty(parameters.OTTables)
@@ -901,8 +952,27 @@ methods
                         error('matlabFunctions:invalidArguments', 'Unrecognized OTTable name');
                     end
                     for i=1:length(inds)
-                        indsToKeep{l,i} = indsToKeep{l,i} & penalties{l,pid,i} >= (parameters.OTTables{2*t}(1)-numPad) ...
-                            & penalties{l,pid,i} <= (parameters.OTTables{2*t}(2)+numPad);
+                        
+                        % Conditional as above.  If penalty is empty,
+                        % sequence too short to have OK indices. Set all to
+                        % 0. 
+                        
+                        if isempty(penalties{l,pid,i})
+                            indsToKeep{l, i} = zeros(1, numel(obj.transcriptome.intSequences{i}) - parameters.regionLength + 1, 'logical');
+                        else
+                            try 
+                                indsToKeep{l,i} = indsToKeep{l,i} & penalties{l,pid,i} >= (parameters.OTTables{2*t}(1)-numPad) ...
+                                    & penalties{l,pid,i} <= (parameters.OTTables{2*t}(2)+numPad);
+                            
+                            catch mError
+                                assignin('base', 'penalties', penalties);
+                                assignin('base', 'pid', pid);
+                                assignin('base', 't', t);
+                                assignin('base', 'i', i);
+                                display('Failed on penalties from OTTable section.');
+                                rethrow(mError);
+                            end
+                        end
                     end
                 end
             end
@@ -1030,8 +1100,30 @@ methods
                 case 'transcriptome'
                     obj.transcriptome.Save([dirPath 'transcriptome']);
                 otherwise
-                    SaveAsByteStream([dirPath fieldsToSave{i} '.matb'], ...
-                        obj.(fieldsToSave{i}), 'verbose', obj.verbose);
+                    
+                    tempField = obj.(fieldsToSave{i});
+                    tFprops = whos('tempField');
+                    
+                    if tFprops.bytes > (2^32 - 1)
+                       % File is too big and has to be saved in parts
+                       % Limiting part size to 2^16 entries.
+                       %
+                       % LoadSplitByteStream is invoked on
+                       % these files later.
+                       
+                       SaveSplitByteStream([dirPath fieldsToSave{i} '.matb'], ...
+                            obj.(fieldsToSave{i}), ...  
+                            (2^(32 - 16)), ...
+                            'verbose', obj.verbose);
+                        
+                    else
+                        % File small enough to deal with using normal
+                        % approach
+                        
+                        SaveAsByteStream([dirPath fieldsToSave{i} '.matb'], ...
+                            obj.(fieldsToSave{i}), 'verbose', obj.verbose);
+                        
+                    end
             end
         end
     end
@@ -1091,6 +1183,22 @@ methods (Static)
                 otherwise
                     obj.(fieldsToLoad{i}) = LoadByteStream([dirPath fieldsToLoad{i} '.matb'], ...
                     'verbose', true);
+                
+                    if isstruct(obj.(fieldsToLoad{i}))
+                        % Could be a split byte stream where only directory
+                        % was loaded before.
+                        if isfield(obj.(fieldsToLoad{i}), 'isByteStream')
+                            if obj.(fieldsToLoad{i}).isByteStream == 'Y'
+                            
+                                obj.(fieldsToLoad{i}) = LoadSplitByteStream(fullfile(dirPath, strcat(fieldsToLoad{i}, '.matb')), ...
+                                                    'verbose', true);
+                                
+                            end
+                        end
+                        
+                        
+                    end
+                
             end
         end
     end
