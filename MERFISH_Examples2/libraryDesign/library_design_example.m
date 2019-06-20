@@ -68,6 +68,9 @@ regionDesignParameters.GC = [0 1]; % Fractional content
 regionDesignParameters.Tm = [0 100]; % deg C
 regionDesignParameters.isoSpecificity = [0.75 1];
 regionDesignParameters.specificity = [0.75 1];
+regionDesignParameters.monovalentSaltConcentration = 0.3; % mol/L
+regionDesignParameters.probeConcentration = 5e-9; % mol/L
+regionDesignParameters.probeSpacing = 0; % nt of gap between probes - set to negative to allow overlap
 
 numProbesPerGene = 92;
 libraryName = ['L1E6'];
@@ -368,6 +371,9 @@ if ~exist(trRegionsPath)
 		'Tm', regionDesignParameters.Tm, ...
 		'isoSpecificity', regionDesignParameters.isoSpecificity, ...
 		'specificity', regionDesignParameters.specificity, ...
+        'monovalentSalt', regionDesignParameters.monovalentSaltConcentration, ...
+        'probeConc', regionDesignParameters.probeConcentration, ...
+        'threePrimeSpace', regionDesignParameters.probeSpacing, ...
 		'OTTables', {'rRNA', [0, 0]});
     
             % NOTE: The ranges above were determined empirically to strike 
