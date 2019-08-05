@@ -17,7 +17,7 @@ This software requires the following software packages.
 2. [storm-analysis](https://github.com/ZhuangLab/storm-analysis): A collection of STORM analysis functions, primarily in Python.
 3. [export-fig](https://github.com/altmany/export_fig): A figure export package for Matlab. 
 4. Matlab.
-5. Python 2.7 (Only for storm-analysis)
+5. Python 3.6 (Only for storm-analysis)
 
 ## Installation Instructions
 
