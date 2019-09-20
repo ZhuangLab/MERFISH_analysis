@@ -291,7 +291,7 @@ methods
         end
 
         % Save penalty
-        obj.penalties{end+1} = penalty; 
+        obj.penalties{end+1} = penalty; % Can't linearize as OT Table names have to line up with indices of penalties.
         
         % -------------------------------------------------------------------------
         % Display progress
@@ -1009,7 +1009,11 @@ methods
         % -------------------------------------------------------------------------
         % Loop over objects in parallel
         % -------------------------------------------------------------------------
-        parfor (i=1:length(inds), obj.numPar)   
+        parfor (i=1:length(inds), obj.numPar)   % Get out of memory errors in this section
+                                                % Maybe because portions
+                                                % continue to get added to
+                                                % localProps instead of
+                                                % pre-allocated?
             % Compile region properties
             regionProps = zeros(6,0);
             for l=1:length(regionLength)
@@ -1099,21 +1103,28 @@ methods
                     obj.isoSpecificityTables.Save([dirPath 'isoSpecificityTables']);
                 case 'transcriptome'
                     obj.transcriptome.Save([dirPath 'transcriptome']);
+                    
+                case 'penalties'
+                    
+                    tempField = obj.penalties; % Duplicate field to avoid BS w/ MATLAB save function
+                    save(fullfile(dirPath, 'penalties.mat'), 'tempField', '-v7.3');
+                    clear tempField;
+                    
                 otherwise
                     
                     tempField = obj.(fieldsToSave{i});
                     tFprops = whos('tempField');
                     
-                    if tFprops.bytes > (2^32 - 1)
+                    if tFprops.bytes > (2^(32 - 18))
                        % File is too big and has to be saved in parts
-                       % Limiting part size to 2^16 entries.
+                       % Limiting part size to 2^14 entries.
                        %
                        % LoadSplitByteStream is invoked on
                        % these files later.
                        
                        SaveSplitByteStream([dirPath fieldsToSave{i} '.matb'], ...
                             obj.(fieldsToSave{i}), ...  
-                            (2^(32 - 16)), ...
+                            (2^(32 - 18)), ...% Chunk size.  Very conservative. Yields ~0.5-1GB file sizes.
                             'verbose', obj.verbose);
                         
                     else
@@ -1180,6 +1191,13 @@ methods (Static)
                     obj.isoSpecificityTables = OTTable.Load([dirPath 'isoSpecificityTables']);
                 case 'transcriptome'
                     obj.transcriptome = Transcriptome.Load([dirPath 'transcriptome']);
+                    
+                case 'penalties'
+                    
+                    tF = load(fullfile(dirPath, 'penalties.mat'), 'tempField');
+                    obj.penalties = tF.tempField;
+                    clear tF;
+                    
                 otherwise
                     obj.(fieldsToLoad{i}) = LoadByteStream([dirPath fieldsToLoad{i} '.matb'], ...
                     'verbose', true);

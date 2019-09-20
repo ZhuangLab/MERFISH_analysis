@@ -68,7 +68,7 @@ methods
         defaults = cell(0,3);
         
         defaults(end+1,:) = {'verbose', 'boolean', false}; % Display progress of construction
-        defaults(end+1,:) = {'headerType', {'cufflinks', 'ensembl', 'custom'}, 'cufflinks'}; % Assume a cufflinks format
+        defaults(end+1,:) = {'headerType', {'cufflinks', 'ensembl', 'custom', 'refseq'}, 'cufflinks'}; % Assume a cufflinks format
         defaults(end+1,:) = {'IDType', 'string', 'NCBI'}; % The type of transcript ID, e.g. ENSEMBL or NCBI. 
         defaults(end+1,:) = {'abundPath', 'filePath', []}; % Path to abundance data
         
@@ -177,7 +177,63 @@ methods
                             
                             fprintf(1, 'Failed on transcriptome i = %d\n', i);
                             assignin('base', 'parsedData', parsedData);
+                            assignin('base', 'header', transcriptome(i).Header);
                             
+                        end
+                    end
+                    
+                case 'refseq'
+                    
+   
+                    % Brute-force name convention cases here
+                    parseFuncA = @(x)regexp(x, '(?<id>^NM_\d+[.]\d).*(?<name>\(\S+\))', 'names');
+                    parseFuncB = @(x)regexp(x, '(?<id>^XM_\d+[.]\d).*(?<name>\(\S+\))', 'names');
+                    parseFuncC = @(x)regexp(x, '(?<id>^NR_\d+[.]\d).*(?<name>\(\S+\))', 'names');
+                    parseFuncD = @(x)regexp(x, '(?<id>^XR_\d+[.]\d).*(?<name>\(\S+\))', 'names');
+                    for i = 1:length(transcriptome)
+                        
+                        if transcriptome(i).Header(1) == 'X'
+                            if transcriptome(i).Header(2) == 'M'
+                                parseFunc = parseFuncB;
+                            
+                            elseif transcriptome(i).Header(2) == 'R'
+                                parseFunc = parseFuncD;
+                                
+                            else
+                                fprintf(1, 'Transcriptome i = %d has unexpected header\n', i);
+                                assignin('base', 'parsedData', parsedData);
+                                assignin('base', 'header', transcriptome(i).Header);
+                            end
+                            
+                        elseif transcriptome(i).Header(1) == 'N'
+                            if transcriptome(i).Header(2) == 'M'
+                                parseFunc = parseFuncA;
+                            
+                            elseif transcriptome(i).Header(2) == 'R'
+                                parseFunc = parseFuncC;
+                                
+                            else
+                                fprintf(1, 'Transcriptome i = %d has unexpected header\n', i);
+                                assignin('base', 'parsedData', parsedData);
+                                assignin('base', 'header', transcriptome(i).Header);
+                            end
+                            
+                        else
+                            fprintf(1, 'Transcriptome i = %d has unexpected header\n', i);
+%                             assignin('base', 'parsedData', parsedData);
+                            assignin('base', 'header', transcriptome(i).Header);
+                                
+                        end
+                        
+                        try
+                            parsedData = parseFunc(transcriptome(i).Header);
+                            obj.ids{i} = parsedData.id;
+                            obj.geneNames{i} = parsedData.name((1 + strfind(parsedData.name, '(')):(strfind(parsedData.name, ')') - 1));
+                            obj.intSequences{i} = int8(nt2int(transcriptome(i).Sequence)) - 1;
+                        catch 
+                            fprintf(1, 'Failed on transcriptome i = %d\n', i);
+%                             assignin('base', 'parsedData', parsedData);
+                            assignin('base', 'header', transcriptome(i).Header);
                         end
                     end
             end

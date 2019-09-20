@@ -1,17 +1,4 @@
-#################
-## Matlab
-#################
-*.asv
-*.m~
-
-#################
-## export_fig
-#################
-.ignore/
-
-#################
-## Example MERFISH data
-#################
-MERFISH_Examples/
-MERFISH_Examples2/
-
+# ignore all files...
+*.*
+# except
+!*.m
