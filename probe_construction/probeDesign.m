@@ -44,6 +44,8 @@ classdef probeDesign < matlab.mixin.SetGet
 
         nPrimersToGenerate {mustBeNumeric, mustBeNonnegative} = 1e3;
         primerLength {mustBeNumeric, mustBeNonnegative} = 20;
+        primerMonovalentSaltConcentration{mustBeNumeric, mustBeNonnegative} = 0.3;
+        primerConcentration {mustBeNumeric, mustBeNonnegative} = 0.5e-6;
         cutPrimersTm = [70, 72];
         cutPrimersGC = [0.5, 0.65];
         cutPrimersMaxHomologySelf {mustBeNumeric, mustBeNonnegative} = 6;
@@ -53,6 +55,8 @@ classdef probeDesign < matlab.mixin.SetGet
         versionMatch {mustBeNumericOrLogical} = false;
         
         doubleHeadedsmELT {mustBeNumericOrLogical} = false;
+        
+        keepAllPossibleProbes {mustBeNumericOrLogical} = true;
         
         %---------------------------------------------------------------
         % Generated paths that could be reused if existing, things match
@@ -78,6 +82,7 @@ classdef probeDesign < matlab.mixin.SetGet
                 
                 if (strcmpi((pd.species), 'mus musculus')) || strcmpi((pd.species), 'mouse')
                     
+                    pd.basePath = 'D:\Data\MERFISH\Musmusculus\';
                     pd.rawTranscriptomeFasta = 'Mus_musculus.GRCm38.cdna.all.fa';
                     pd.fpkmPath = 'Mus_musculus_proxyRandomFPKM.fpkm_tracking';
                     pd.ncRNAPath = 'Mus_musculus.GRCm38.ncrna.fa';
@@ -87,6 +92,7 @@ classdef probeDesign < matlab.mixin.SetGet
                     
                 elseif (strcmpi((pd.species), 'homo sapiens')) || strcmpi((pd.species), 'human')
                     
+                    pd.basePath = 'D:\Data\MERFISH\Homosapiens\';
                     pd.rawTranscriptomeFasta = 'Homo_sapiens_GRCh38_latest_rna.fna';
                     pd.fpkmPath = 'Homo_sapiens_proxyRandomFPKM.fpkm_tracking';
                     pd.ncRNAPath = 'Homo_sapiens.GRCh38.ncrna.fa';

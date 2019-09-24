@@ -2,3 +2,7 @@
 *.*
 # except
 !*.m
+!./MERFISHProbeDesign/README.md
+!./MERFISHProbeDesign/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv
+!./MERFISHProbeDesign/MERFISH_Examples2/readoutsHypothalamus.fasta
+!./MERFISHProbeDesign/MERFISH_Examples2/Mus_musculus_proxy.fpkm_tracking

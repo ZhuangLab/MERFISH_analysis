@@ -129,6 +129,9 @@ function MERFISHProbeDesign(varargin)
         primerDesignParameters.cutPrimers.GC = [0.5 0.65];
         primerDesignParameters.cutPrimers.maxHomologySelf = 6;
         primerDesignParameters.cutPrimers.maxHomologyCross = 8;
+        primerDesignParameters.primerMonovalentSaltConcentration = 0.3;
+        primerDesignParameters.primerConcentration = 0.5e-6;
+        
 
         % Indicate if this is allowed to ignore sequence version number in matching
         versionMatch = false;
@@ -136,6 +139,8 @@ function MERFISHProbeDesign(varargin)
         % For smELT probes where fewer than numProbesPerGene found, allow
         % adding second readout sequence to other end of probe 
         doubleHeadedsmELT = false;
+        
+        keepAllPossibleProbes = true;
         
     elseif (nargin == 1) && isa(varargin{1}, 'probeDesign')
         
@@ -212,11 +217,15 @@ function MERFISHProbeDesign(varargin)
         primerDesignParameters.cutPrimers.GC = obj.cutPrimersGC;
         primerDesignParameters.cutPrimers.maxHomologySelf = obj.cutPrimersMaxHomologySelf;
         primerDesignParameters.cutPrimers.maxHomologyCross = obj.cutPrimersMaxHomologyCross;
+        primerDesignParameters.primerMonovalentSaltConcentration = obj.primerMonovalentSaltConcentration;
+        primerDesignParameters.primerConcentration = obj.primerConcentration;
 
         % Indicate if this is allowed to ignore sequence version number in matching
         versionMatch = obj.versionMatch;
         
         doubleHeadedsmELT = obj.doubleHeadedsmELT;
+        
+        keepAllPossibleProbes = obj.keepAllPossibleProbes;
         
     else
         error('MERFISHProbeDesign inputs incorrect.');
@@ -431,13 +440,13 @@ function MERFISHProbeDesign(varargin)
                     fprintf(1, 'trDesigner check failed. Using default path.\n');
                 end
             catch
-                fprintf(1, 'trDesigner load error.  Setting path to default');
+                fprintf(1, 'trDesigner load error.  Setting path to default\n');
             end
         else
-            fprintf(1, 'trDesigner not valid.  Setting path to default');
+            fprintf(1, 'trDesigner not valid.  Setting path to default\n');
         end
     else
-        fprintf(1, 'trDesigner path not specified.  Setting path to default');
+        fprintf(1, 'trDesigner path not specified.  Setting path to default\n');
 
     end
     
@@ -470,6 +479,7 @@ function MERFISHProbeDesign(varargin)
     oligosPath = [analysisSavePath libraryName '_oligos.fasta'];
     finalPrimersPath = [analysisSavePath libraryName '_primers.fasta'];
     primersPath = [analysisSavePath libraryName '_possible_primers.fasta'];
+    allOligosPath = [analysisSavePath libraryName '_AllOligos.fasta'];
     
     % Check to see if any of the required or generated files already exist.
     % If any of these exist it would cause function to exit, so check
@@ -487,7 +497,8 @@ function MERFISHProbeDesign(varargin)
                     possibleOligosPath, 'crashIfPresent'; ...
                     oligosPath, 'crashIfPresent'; ...
                     primersPath, 'crashIfPresent'; ...
-                    finalPrimersPath, 'crashIfPresent'};
+                    finalPrimersPath, 'crashIfPresent'; ...
+                    allOligosPath, 'crashIfPresent'};
 
     % Check that paths generated exist or not as required by downstream
     % code
@@ -520,6 +531,9 @@ function MERFISHProbeDesign(varargin)
         fprintf(logFID, 'usedReadoutPath : %s\n', usedReadoutPath);
         fprintf(logFID, 'possibleOligosPath : %s\n', possibleOligosPath);
         fprintf(logFID, 'oligosPath : %s\n', oligosPath);
+        if keepAllPossibleProbes
+            fprintf(logFID, 'allOligosPath : %s\n', allOligosPath);
+        end
         fprintf(logFID, '-----------------------------\n');
         fprintf(logFID, 'transcriptomeHeaderType : %s\n', transcriptomeHeaderType);
         fprintf(logFID, 'transcriptomeIDType : %s\n', transcriptomeIDType);
@@ -549,9 +563,12 @@ function MERFISHProbeDesign(varargin)
         fprintf(logFID, 'primerLength : %d\n', primerDesignParameters.primerLength);
         fprintf(logFID, 'GC : [%d, %d]\n', primerDesignParameters.cutPrimers.GC);
         fprintf(logFID, 'Tm : [%d, %d]\n', primerDesignParameters.cutPrimers.Tm);
+        fprintf(logFID, 'primerMonovalentSaltConcentration : %d\n', primerDesignParameters.primerMonovalentSaltConcentration);
+        fprintf(logFID, 'primerConcentration : %d\n', primerDesignParameters.primerConcentration);
         fprintf(logFID, 'maxHomologySelf : %d\n', primerDesignParameters.cutPrimers.maxHomologySelf);
         fprintf(logFID, 'maxHomologyCross : %d\n', primerDesignParameters.cutPrimers.maxHomologyCross);
         fprintf(logFID, 'doubleHeadedsmELT : %d\n', doubleHeadedsmELT);
+        fprintf(logFID, 'keepAllPossibleProbes : %d\n', keepAllPossibleProbes);
         fprintf(logFID, '-----------------------------\n');
 
 
@@ -1007,12 +1024,24 @@ function MERFISHProbeDesign(varargin)
         %% Build possible probes -- more than are needed are constructed to allow those with homology to rRNA/tRNA to be removed
 
         fprintf(logFID, '%s - Building possible oligomers. \n', datestr(datetime));
-
         
-        if ~exist(possibleOligosPath)
+        if keepAllPossibleProbes
+            keepGoingFlag = exist(possibleOligosPath, 'file') ~= 2;
+        else
+            keepGoingFlag = (exist(possibleOligosPath, 'file') ~= 2) && (exist(allOligosPath, 'file') == 2);
+        end
+        
+        
+        if keepGoingFlag
             oligos = [];
 
             lastGene = '';
+            
+            if keepAllPossibleProbes
+                allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+                allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+                seqCount = 1;
+            end
 
             for i=1:length(finalIds)
                 % Save local gene
@@ -1217,9 +1246,19 @@ function MERFISHProbeDesign(varargin)
 
 
                         % Save new oligos in oligos struct
+                        % In this block, only those probes with valid
+                        % indsToKeepForReal are retained.  If we want *ALL*
+                        % possible probes, then see next block.
                         for s=1:length(indsToKeepForReal)
                             oligos(end+1).Header = headers{indsToKeepForReal(s)};
                             oligos(end).Sequence = seqs{indsToKeepForReal(s)};
+                        end
+                        
+                        if keepAllPossibleProbes
+                            % Append all headers + seqs to cell
+                            allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
+                            allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
+                            seqCount = seqCount + length(seqs);
                         end
 
 
@@ -1242,6 +1281,19 @@ function MERFISHProbeDesign(varargin)
             fastawrite(possibleOligosPath, oligos);
             display(['... completed in ' num2str(toc(writeTimer))]);
             fprintf(logFID, '%s - Completed in %d s\n', datestr(datetime), toc(writeTimer));
+            
+            if keepAllPossibleProbes
+                
+                allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
+                
+                PageBreak();
+                fprintf(1, 'Writing: %s\n', allOligosPath);
+                fprintf(logFID, '%s - Writing %s!\n', datestr(datetime), allOligosPath);
+                writeTimer = tic;
+                fastawrite(allOligosPath, allOligos);
+                display(['... completed in ' num2str(toc(writeTimer))]);
+                fprintf(logFID, '%s - Completed in %d s\n', datestr(datetime), toc(writeTimer));
+            end
 
         else % End oligo design
             fprintf(logFID, '%s - Possible oligos file found.  Exiting. \n', datestr(datetime), toc(writeTimer));
@@ -1278,7 +1330,9 @@ function MERFISHProbeDesign(varargin)
                 'primerLength', primerDesignParameters.primerLength, ...
                 'OTTables', encodingProbeOTTable, ...
                 'OTTableNames', {'encoding'}, ...
-                'parallel', p);
+                'parallel', p, ...
+                'monovalentSalt', primerDesignParameters.primerMonovalentSaltConcentration, ...
+                'primerConc', primerDesignParameters.primerConcentration);
 
             % Cut primers
             prDesigner.CutPrimers('Tm', primerDesignParameters.cutPrimers.Tm, ...

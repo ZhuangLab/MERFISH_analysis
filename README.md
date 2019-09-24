@@ -1,20 +1,31 @@
 AIBS fork of code with modifications to support robust design of MERFISH probes. 
-Forked by Rusty Nicovich 4/18.  Continued edits to support sequential probes and mouse transcriptome sense. 
+Forked by Rusty Nicovich 4/18.  Continued edits to support sequential probes, mouse transcriptome sense, logging, and object-oriented execution.
 
 Key edits and notes:
 
+- Removal of dependence on matlab-storm files.
+- Removal of code-initiated edits to MATLAB path.
+- Bug fixes to allow execution of code as published on original repo. 
+- Collected all apparent parameters into named variables at top of library_design_example.m script.
+- Completed implementation for using Ensembl and RefSeq (Entrez) transcriptome files + gene names.
 - Sequentially-probed genes (aka smELT) in same or separate panel as barcoded (aka MERFISH) genes supported.
 - Bug fix to allow large binary objects to be saved and loaded to/from disk. 
 - Support for un-sliced mouse or human transcriptome to pass through analysis.
-- Convenience edits in library_design_example to make easier to use for probe design. 
 - Tested with publicly-available mouse transcriptome and non-coding RNA files.
 - When not thresholding on any gene abundance (threshold >= 0) then *bulk sequencing is not needed* (proxy file required, but can be made from transcriptome directly). 
+- Renamed library_design_example.m to MERFISHProbeDesign.m and moved to .\probe_construction folder.
+- Refactored MERFISHProbeDesign to accept probeDesign object (from .\probe_construction\probeDesign.m) in addition to running as script with internal variable values.
+- Add output of all probes ([libraryName]_AllOligos.fasta) generated in calculations.
+- Add output of message log ([libraryName].log) with error logging.
+- Begin implementation of reading on-disk files when specified (preliminary).
+
+-------------------------------------------------------------------------------------------
 
 Required inputs for given run:
 Transcriptome file (ex for mouse):
 ftp://ftp.ensembl.org/pub/release-96/fasta/mus_musculus/cdna/
 
-Non-codding RNA file (ex for mouse):
+Non-coding RNA file (ex for mouse):
 ftp://ftp.ensembl.org/pub/release-96/fasta/mus_musculus/ncrna/
 
 Codebook file w/ gene name, isoform, and binary codes as to MERFISH +- smELT format
@@ -25,6 +36,118 @@ Readouts.fasta file
 
 Proxy bulk sequencing file (created with ./MERFISH_anlaysis/MERFISH_Examples2/makeFPKMfileFromCodebook.m0:
 ./MERFISH_anlaysis/MERFISH_Examples2/Mus_musculus_proxy.fpkm_tracking
+
+Requires all sub-folders of this repo be on MATLAB path to execute.
+
+-------------------------------------------------------------------------------------------
+
+Most straightforward execution is to collect variables into probeDesign object and then call probeDesign.buildLibrary() method. 
+This can be done in script with parameters edited using set-get methods. Convenience methods are included to start from reference log file or from default inputs for given species.
+Example:
+    codebookPath = './MERFISH_anlaysis/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv';
+    pd = probeDesign('hypothalamusLibrary', 'mouse', codebookPath);
+	set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0.75, 1], 'specificity', [0.75, 1]);
+	set(pd, 'FPKMabundanceThreshold', 0, 'numProbesPerGene', 92);
+	pd.buildLibrary();
+	
+Or:
+	% Initialize empty probe design object
+	pd = probeDesign();
+	% Match previous log file
+	logFilePath = 'D:\Data\MERFISH\Homosapiens\SMT-H-1002_isoSpec_70-100\SMT-H-1002_isoSpec_70-100.log';
+	pd.matchLogFile(logFilePath);
+	set(pd, 'species', 'Homo sapiens');
+	set(pd, 'libraryName', 'SMT-H-1002', 'probeSpacing', -20, 'doubleHeadedsmELT', true);
+	pd.buildLibrary();
+	
+
+Details on variables in probeDesign object:
+
+Required variables:
+
+                          MERFISHAnalysisPath: String. Path to load directory for rawTranscriptomeFasta, fpkmPath, ncRNAPath, transcriptomeHeaderType.  
+												This folder + sub-folders should be on MATLAB path.
+                                     basePath: String. Path to save directory for outputs. 
+                                  libraryName: String. Name to call library. Prefix for output files.
+                                      species: String. Which species this is.  For saving and convenince with default paths of rawTranscriptomeFasta, fpkmPath, ncRNAPath,
+												transcriptomeHeaderType and transcriptomeIDType.
+                        rawTranscriptomeFasta: String. Path to transcriptome.fasta file.  Format must match transcriptomeHeaderType and transcriptomeIDType.  
+												Path must be to valid fasta file. 
+                                     fpkmPath: String. Path to isoforms.fpkm_tracking file.  Format must match transcriptomeHeaderType and transcriptomeIDType.  
+												Transcript IDs and gene names must match those in rawTranscriptomeFasta.  Path must be to valid file.
+                                    ncRNAPath: String. Path to species.GRCh38.ncrna.fa file.  Path must be to valid file. 
+                                  readoutPath: String. Path to readouts.fasta file containing readout sequences and names.  Names must match those in Codebook.  
+												Path must be to valid fasta file. 
+                                 codebookPath: String. Path to input codebook file.  Gene names must match that in fpkmPath.  Gene IDs must match those in rawTranscriptomeFasta. 
+												If transcript version numbers do not match rawTranscriptomeFasta, set versionMatch below to false.
+												Readout names must match those in readoutPath.  Path must be to valide codebook file. 
+												Format of codebook controlled.  See examples and schema for reference.
+                      transcriptomeHeaderType: String. 'cufflinks', 'ensembl', or 'refseq'
+                          transcriptomeIDType: String. 'NCBI' ['cufflinks' or 'refseq' header type] or 'ENSEMBL' ['ensembl'] 
+           penaltyTableExactHomologyToExclude: Double. Used in primer design + rRNA/tRNA penalty table.
+                       FPKMabundanceThreshold: Double. Min expression threshold in bulk sequencing data for consideration in isoSpecificity calculations. 
+												Set to 0 to include all possible transcripts.
+                            useUniformWeights: Boolean. Set to true to include fpkmPath file contents in isoSpecificity calculation. 
+												Set to false (and FPKMabundanceThreshold to 0) to ignore contents of fpkmPath file. 
+    isoSpecificityTable_lengthOfExactHomology: Double. Length of exact homology used to calculate isoSpecificity penalties.
+                                 regionLength: Double.  Length of probing region. Used in trDesigner.DesignTargetRegions.
+									 regionGC: [Double Double].  Range for GC content of accepted probe regions. Used in trDesigner.DesignTargetRegions.
+                                     regionTm: [Double Double].  Range for Tm value of accepted probe regions. Used in trDesigner.DesignTargetRegions.
+                               isoSpecificity: [Double Double].  Range of uniqueness of regions to probe in selected transcript(s). Measured between isoforms of same gene.  
+												Can include abundance information from fpkmPath file if useUniformWeights set to true.  Used in trDesigner.DesignTargetRegions.
+                                  specificity: [Double Double].  Range of uniqueness for selected transcript(s) against all other genes.  Used in trDesigner.DesignTargetRegions.
+                  monovalentSaltConcentration: Double. Concentration (in mol/L) of monovalent salt for Tm calc.  Used in trDesigner.DesignTargetRegions and PrimerDesigner.
+                           probeConcentration: Double. Concentration (in mol/L) of probe for Tm calc.  Used in trDesigner.DesignTargetRegions and PrimerDesigner.
+                                 probeSpacing: Double. Gap between adjacent probes on target transcripts, in nT.  Used in trDesigner.DesignTargetRegions.
+                             numProbesPerGene: Double.  Number of probes to retain per target gene. Total across all transcripts given for that gene. 
+                           nPrimersToGenerate: Double.  Number of primers to generate before culling to acceptable selected pool. Used in PrimerDesigner.
+                                 primerLength: Double.  Length of primers, in nT. Used in PrimerDesigner.
+                                 cutPrimersTm: [Double Double].  Range of Tm for generated primer regions. Used in PrimerDesigner.cutPrimers.
+                                 cutPrimersGC: [Double Double].  Range of GC content for accepted primer regions. Used in PrimerDesigner.cutPrimers.
+                    cutPrimersMaxHomologySelf: Double. Max self-homology length accepted in primers. Used in PrimerDesigner.RemoveSelfCompPrimers.
+                   cutPrimersMaxHomologyCross: Double. Max cross-homology length accepted in primers. Used in PrimerDesigner.RemoteHomologousPrimers.
+                                 versionMatch: Boolean.  If true, codebook and transcriptome must have exact match between transcript ID and version number.  
+												If false, only transcript ID need match.  Ex : 'ENST00000374472.4' must match if true, but only 'ENST00000374472' if false.
+												Used in oligomers build step.
+                            doubleHeadedsmELT: Boolean.  If true, append same readout to both ends of transcript if number of probes for this gene < nProbesPerGene AND
+												Codebook has 1 positive bit for gene.  Used in oligomers build step. 
+                                 rRNAtRNAPath: String.  File path to previously-generated rRNAtRNAPath file.  Will be loaded if inputs in object match those of saved.
+                            transcriptomePath: String.  File path to previously-generated transcriptome object file.  Will be loaded if inputs in object match those of saved.
+                         specificityTablePath: String.  File path to previously-generated specificity table object file.  Will be loaded if inputs in object match those of saved.
+                      isoSpecificityTablePath: String.  File path to previously-generated isoSpecificity table object file.  Will be loaded if inputs in object match those of saved.
+                               trDesignerPath: String.  File path to previously-generated trDesigner object folder.  Will be loaded if inputs in object match those of saved.
+
+Defaults in GitHub repo code:
+
+                          MERFISHAnalysisPath: ['C:\Users\Jeff.Morgan0\Dropbox\ZhuangLab\MERFISH_Public\MERFISH_analysis\']; Specified in .\startup\merfish_startup.m line 56.
+                                     basePath: [MERFISHAnalysisPath '\MERFISH_Examples2\']; 			Specified in .\example_scripts\library_design.m line 15.
+                                  libraryName: ['L1E1']; 												Specified in .\example_scripts\library_design.m line 294.
+                        rawTranscriptomeFasta: [basePath 'transcripts.fasta']; 							Specified in .\example_scripts\library_design.m line 20.
+                                     fpkmPath: [basePath 'isoforms.fpkm_tracking']; 					Specified in .\example_scripts\library_design.m line 21.
+                                    ncRNAPath: [basePath 'Homo_sapiens.GRCh38.ncrna.fa']; 				Specified in .\example_scripts\library_design.m line 22. 
+                                  readoutPath: [basePath 'readouts.fasta']; 							Specified in .\example_scripts\library_design.m line 23. 
+                                 codebookPath: [basePath 'codebook.csv']; 								Specified in .\example_scripts\library_design.m line 24. 
+                      transcriptomeHeaderType: 'cufflinks'; 											Specified in .\probe_construction\Transcriptome.m line 71. 
+                          transcriptomeIDType: 'NCBI'; 													Specified in .\probe_construction\Transcriptome.m line 72.
+           penaltyTableExactHomologyToExclude: 15; 														Specified in .\example_scripts\library_design.m line 195.
+                       FPKMabundanceThreshold: 1e-2; 													Specified in .\example_scripts\library_design.m line 211.
+                            useUniformWeights: False; 							Specified in .\probe_construction\OTTable.m line 87, .\example_scripts\library_design.m line 136.
+    isoSpecificityTable_lengthOfExactHomology: 17; 														Specified in .\example_scripts\library_design.m line 134.
+                                 regionLength: 30; 														Specified in .\example_scripts\library_design.m line 235.
+									 regionGC: [0.43, 0.63]; 											Specified in .\example_scripts\library_design.m line 236.
+                                     regionTm: [66, 76]; 												Specified in .\example_scripts\library_design.m line 237.
+                               isoSpecificity: [0.75, 1]; 												Specified in .\example_scripts\library_design.m line 238.
+                                  specificity: [0.75, 1]; 												Specified in .\example_scripts\library_design.m line 239.
+                  monovalentSaltConcentration: 0.3; 													Specified in .\probe_construction\TRDesigner.m line 800.
+                           probeConcentration: 5e-9; 													Specified in .\probe_construction\TRDesigner.m line 801.
+                                 probeSpacing: 0; 														Specified in .\probe_construction\TRDesigner.m line 804 as 'threePrimeSpace'.
+                             numProbesPerGene: 92; 														Specified in .\example_scripts\library_design.m line 293.
+                           nPrimersToGenerate: 1000; 													Specified in .\example_scripts\library_design.m line 437.
+                                 primerLength: 20 														Specified in .\example_scripts\library_design.m line 438.
+                                 cutPrimersTm: [70, 72] 												Specified in .\example_scripts\library_design.m line 444.
+                                 cutPrimersGC: [0.5, 0.65] 												Specified in .\example_scripts\library_design.m line 445.
+                    cutPrimersMaxHomologySelf: 6 														Specified in .\example_scripts\library_design.m line 448.
+                   cutPrimersMaxHomologyCross: 8 														Specified in .\example_scripts\library_design.m line 449.
 
 -------------------------------------------------------------------------------------------
 
