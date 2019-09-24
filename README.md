@@ -43,7 +43,7 @@ Readouts.fasta file
 ./MERFISH_anlaysis/MERFISH_Examples2/readoutsHypothalamus.fasta
 
 
-Proxy bulk sequencing file (created with ./MERFISH_anlaysis/MERFISH_Examples2/makeFPKMfileFromCodebook.m0:
+Proxy bulk sequencing file (created with ./MERFISH_anlaysis/MERFISH_Examples2/libraryDesign/makeFPKMfileFromCodebook.m):
 
 ./MERFISH_anlaysis/MERFISH_Examples2/Mus_musculus_proxy.fpkm_tracking
 
