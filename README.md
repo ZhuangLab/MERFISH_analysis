@@ -22,43 +22,55 @@ Key edits and notes:
 -------------------------------------------------------------------------------------------
 
 Required inputs for given run:
+
 Transcriptome file (ex for mouse):
+
 ftp://ftp.ensembl.org/pub/release-96/fasta/mus_musculus/cdna/
 
+
 Non-coding RNA file (ex for mouse):
+
 ftp://ftp.ensembl.org/pub/release-96/fasta/mus_musculus/ncrna/
 
+
 Codebook file w/ gene name, isoform, and binary codes as to MERFISH +- smELT format
+
 ./MERFISH_anlaysis/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv
 
+
 Readouts.fasta file
+
 ./MERFISH_anlaysis/MERFISH_Examples2/readoutsHypothalamus.fasta
 
+
 Proxy bulk sequencing file (created with ./MERFISH_anlaysis/MERFISH_Examples2/makeFPKMfileFromCodebook.m0:
+
 ./MERFISH_anlaysis/MERFISH_Examples2/Mus_musculus_proxy.fpkm_tracking
 
+
 Requires all sub-folders of this repo be on MATLAB path to execute.
+
 
 -------------------------------------------------------------------------------------------
 
 Most straightforward execution is to collect variables into probeDesign object and then call probeDesign.buildLibrary() method. 
 This can be done in script with parameters edited using set-get methods. Convenience methods are included to start from reference log file or from default inputs for given species.
 Example:
-    codebookPath = './MERFISH_anlaysis/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv';
-    pd = probeDesign('hypothalamusLibrary', 'mouse', codebookPath);
-	set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0.75, 1], 'specificity', [0.75, 1]);
-	set(pd, 'FPKMabundanceThreshold', 0, 'numProbesPerGene', 92);
-	pd.buildLibrary();
+		codebookPath = './MERFISH_anlaysis/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv';
+		pd = probeDesign('hypothalamusLibrary', 'mouse', codebookPath);
+		set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0.75, 1], 'specificity', [0.75, 1]);
+		set(pd, 'FPKMabundanceThreshold', 0, 'numProbesPerGene', 92);
+		pd.buildLibrary();
 	
 Or:
-	% Initialize empty probe design object
-	pd = probeDesign();
-	% Match previous log file
-	logFilePath = 'D:\Data\MERFISH\Homosapiens\SMT-H-1002_isoSpec_70-100\SMT-H-1002_isoSpec_70-100.log';
-	pd.matchLogFile(logFilePath);
-	set(pd, 'species', 'Homo sapiens');
-	set(pd, 'libraryName', 'SMT-H-1002', 'probeSpacing', -20, 'doubleHeadedsmELT', true);
-	pd.buildLibrary();
+		% Initialize empty probe design object
+		pd = probeDesign();
+		% Match previous log file
+		logFilePath = 'D:\Data\MERFISH\Homosapiens\SMT-H-1002_isoSpec_70-100\SMT-H-1002_isoSpec_70-100.log';
+		pd.matchLogFile(logFilePath);
+		set(pd, 'species', 'Homo sapiens');
+		set(pd, 'libraryName', 'SMT-H-1002', 'probeSpacing', -20, 'doubleHeadedsmELT', true);
+		pd.buildLibrary();
 	
 
 Details on variables in probeDesign object:
