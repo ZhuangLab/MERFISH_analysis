@@ -56,27 +56,29 @@ Requires all sub-folders of this repo be on MATLAB path to execute.
 Most straightforward execution is to collect variables into probeDesign object and then call probeDesign.buildLibrary() method. 
 This can be done in script with parameters edited using set-get methods. Convenience methods are included to start from reference log file or from default inputs for given species.
 Example:
-		codebookPath = './MERFISH_anlaysis/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv';
-		pd = probeDesign('hypothalamusLibrary', 'mouse', codebookPath);
-		set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0.75, 1], 'specificity', [0.75, 1]);
-		set(pd, 'FPKMabundanceThreshold', 0, 'numProbesPerGene', 92);
-		pd.buildLibrary();
-	
+```
+codebookPath = './MERFISH_anlaysis/MERFISH_Examples2/codebookMusmusculusHypothalamus_v01.csv';
+pd = probeDesign('hypothalamusLibrary', 'mouse', codebookPath);
+set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0.75, 1], 'specificity', [0.75, 1]);
+set(pd, 'FPKMabundanceThreshold', 0, 'numProbesPerGene', 92);
+pd.buildLibrary();
+```	
 Or:
-		% Initialize empty probe design object
-		pd = probeDesign();
-		% Match previous log file
-		logFilePath = 'D:\Data\MERFISH\Homosapiens\SMT-H-1002_isoSpec_70-100\SMT-H-1002_isoSpec_70-100.log';
-		pd.matchLogFile(logFilePath);
-		set(pd, 'species', 'Homo sapiens');
-		set(pd, 'libraryName', 'SMT-H-1002', 'probeSpacing', -20, 'doubleHeadedsmELT', true);
-		pd.buildLibrary();
-	
+```
+% Initialize empty probe design object
+pd = probeDesign();
+% Match previous log file
+logFilePath = 'D:\Data\MERFISH\Homosapiens\SMT-H-1002_isoSpec_70-100\SMT-H-1002_isoSpec_70-100.log';
+pd.matchLogFile(logFilePath);
+set(pd, 'species', 'Homo sapiens');
+set(pd, 'libraryName', 'SMT-H-1002', 'probeSpacing', -20, 'doubleHeadedsmELT', true);
+pd.buildLibrary();
+```
 
 Details on variables in probeDesign object:
 
 Required variables:
-
+```
                           MERFISHAnalysisPath: String. Path to load directory for rawTranscriptomeFasta, fpkmPath, ncRNAPath, transcriptomeHeaderType.  
 												This folder + sub-folders should be on MATLAB path.
                                      basePath: String. Path to save directory for outputs. 
@@ -128,9 +130,9 @@ Required variables:
                          specificityTablePath: String.  File path to previously-generated specificity table object file.  Will be loaded if inputs in object match those of saved.
                       isoSpecificityTablePath: String.  File path to previously-generated isoSpecificity table object file.  Will be loaded if inputs in object match those of saved.
                                trDesignerPath: String.  File path to previously-generated trDesigner object folder.  Will be loaded if inputs in object match those of saved.
-
+```
 Defaults in GitHub repo code:
-
+```
                           MERFISHAnalysisPath: ['C:\Users\Jeff.Morgan0\Dropbox\ZhuangLab\MERFISH_Public\MERFISH_analysis\']; Specified in .\startup\merfish_startup.m line 56.
                                      basePath: [MERFISHAnalysisPath '\MERFISH_Examples2\']; 			Specified in .\example_scripts\library_design.m line 15.
                                   libraryName: ['L1E1']; 												Specified in .\example_scripts\library_design.m line 294.
@@ -160,7 +162,7 @@ Defaults in GitHub repo code:
                                  cutPrimersGC: [0.5, 0.65] 												Specified in .\example_scripts\library_design.m line 445.
                     cutPrimersMaxHomologySelf: 6 														Specified in .\example_scripts\library_design.m line 448.
                    cutPrimersMaxHomologyCross: 8 														Specified in .\example_scripts\library_design.m line 449.
-
+```
 -------------------------------------------------------------------------------------------
 
 Original README continues below:
