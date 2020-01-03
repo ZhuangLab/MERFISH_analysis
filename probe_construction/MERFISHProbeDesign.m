@@ -502,11 +502,11 @@ function MERFISHProbeDesign(varargin)
 
     % Check that paths generated exist or not as required by downstream
     % code
-    badFilesFound = filePathCheck(pathsToCheck);
+    %badFilesFound = filePathCheck(pathsToCheck);
     
-    if badFilesFound
-        error('Address file path issues and restart processing.');
-    end
+    %if badFilesFound
+     %   error('Address file path issues and restart processing.');
+    %end
                    
     % Start logging
     logFileName = fullfile(analysisSavePath, strcat(libraryName, '.log'));
@@ -661,12 +661,14 @@ function MERFISHProbeDesign(varargin)
             fprintf(logFID, '%s - Building transcriptome object.\n', datestr(datetime));
 
             % Build transcriptome using existing abundance data
+            %transcriptome = Transcriptome(rawTranscriptomeFasta, ...
+             %   'abundPath', fpkmPath, ...
+              %  'verbose', true, ...
+               % 'headerType', transcriptomeHeaderType, ...
+                %'IDType', transcriptomeIDType);
             transcriptome = Transcriptome(rawTranscriptomeFasta, ...
                 'abundPath', fpkmPath, ...
-                'verbose', true, ...
-                'headerType', transcriptomeHeaderType, ...
-                'IDType', transcriptomeIDType);
-
+                'verbose', true);
             transcriptome.Save(transcriptomePath);
             fprintf(logFID, '%s - Transcriptome object saved to %s\n', datestr(datetime), transcriptomePath);
         
@@ -713,15 +715,7 @@ function MERFISHProbeDesign(varargin)
                     fprintf(logFID, '%s - Gene %d of %d. First transcript %s\n', datestr(datetime), i, length(names), idsByName{i}{1});
                 end
 
-                if useUniformWeights
-
-                    % Generate a OTTable for isoforms for the given gene
-                    isoSpecificityTables(i) = OTTable(localTranscriptome, ...
-                        isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
-                        'verbose', false, ...
-                        'transferAbund', false);
-
-                else
+              %  if useUniformWeights
 
                     % Generate a OTTable for isoforms for the given gene
                     isoSpecificityTables(i) = OTTable(localTranscriptome, ...
@@ -729,7 +723,15 @@ function MERFISHProbeDesign(varargin)
                         'verbose', false, ...
                         'transferAbund', true);
 
-                end
+               % else
+
+                    % Generate a OTTable for isoforms for the given gene
+                %    isoSpecificityTables(i) = OTTable(localTranscriptome, ...
+                 %       isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
+                  %      'verbose', false, ...
+                   %     'transferAbund', true);
+
+               % end
 
                 % Name the table
                 isoSpecificityTables(i).name = names{i}; 
@@ -798,7 +800,7 @@ function MERFISHProbeDesign(varargin)
         %% Create parallel pool... speeds up the construction of the TRDesigner and the construction of libraries
         if isempty(gcp('nocreate'))
             fprintf(logFID, '%s - Start parallel processing pool\n', datestr(datetime));
-            p = parpool(5);  % Insert a number here appropriate to the used computational resources
+            p = parpool(4);  % Insert a number here appropriate to the used computational resources
         else
             p = gcp;
         end
@@ -956,9 +958,9 @@ function MERFISHProbeDesign(varargin)
         % string miss-match.  Replacing '_' with ',' in original codebook solves
         % this issue.
 
-        if ~strcmp(transcriptomeIDType, 'NCBI')
-            finalIds = strrep(finalIds, '_', ',');
-        end
+        %if ~strcmp(transcriptomeIDType, 'NCBI')
+         %   finalIds = strrep(finalIds, '_', ',');
+        %end
 
         finalGenes = {codebook.name}; % Extract gene common names from codebook
         barcodes = char({codebook.barcode}) == '1'; % Extract string barcodes and convert to logical matrix
@@ -1108,13 +1110,15 @@ function MERFISHProbeDesign(varargin)
                                     
                                 else
                                     % Create random orientation and selection of readouts
-                                    localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                                    %localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                                     localReadouts = possibleReadouts([1 2 3]);
                                 end
 
 
 
-                                if rand(1) > 0.5
-                                    % Create header 
+                                %if rand(1) > 0.5
+                                if 0.2 >0.5 
+                                % Create header 
                                     headers{p} = [libraryName ' ' ...
                                         localReadouts(1).Header ' ' ...
                                         tRegion.geneName '__' ...
