@@ -502,11 +502,11 @@ function MERFISHProbeDesign(varargin)
 
     % Check that paths generated exist or not as required by downstream
     % code
-    %badFilesFound = filePathCheck(pathsToCheck);
+    badFilesFound = filePathCheck(pathsToCheck);
     
-    %if badFilesFound
-     %   error('Address file path issues and restart processing.');
-    %end
+    if badFilesFound
+        error('Address file path issues and restart processing.');
+    end
                    
     % Start logging
     logFileName = fullfile(analysisSavePath, strcat(libraryName, '.log'));
