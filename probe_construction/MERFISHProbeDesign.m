@@ -1,4 +1,4 @@
-function MERFISHProbeDesign(varargin)
+ function MERFISHProbeDesign(varargin)
 
 
 
@@ -64,6 +64,7 @@ function MERFISHProbeDesign(varargin)
         %-------------------------------------------------------------
 
         % % Mouse 
+        species = 'Mus musculus';
         basePath = 'D:\Data\MERFISH\Musmusculus\'; % Base path where all required files can be found
 
         libraryName = ['SMT-M-1002_v2_noIsoSpecificity_70-100Specificity'];
@@ -142,6 +143,8 @@ function MERFISHProbeDesign(varargin)
         
         keepAllPossibleProbes = true;
         
+        debugMode = false;
+        
     elseif (nargin == 1) && isa(varargin{1}, 'probeDesign')
         
         obj = varargin{1};
@@ -187,8 +190,10 @@ function MERFISHProbeDesign(varargin)
             codebookPath = fullfile(basePath,  obj.codebookPath);
         else
             codebookPath = obj.codebookPath;
-        end
-
+       end
+        
+       species = obj.species;
+        
         transcriptomeHeaderType = obj.transcriptomeHeaderType;
         transcriptomeIDType = obj.transcriptomeIDType;
         
@@ -226,6 +231,8 @@ function MERFISHProbeDesign(varargin)
         doubleHeadedsmELT = obj.doubleHeadedsmELT;
         
         keepAllPossibleProbes = obj.keepAllPossibleProbes;
+        
+        debugMode = obj.debugMode;
         
     else
         error('MERFISHProbeDesign inputs incorrect.');
@@ -516,6 +523,7 @@ function MERFISHProbeDesign(varargin)
         fprintf(logFID, '%s log file\n', libraryName);
         fprintf(logFID, 'basePath : %s\n', basePath);
         fprintf(logFID, '-----------------------------\n');
+        fprintf(logFID, 'species : %s\n', species);
         fprintf(logFID, 'rawTranscriptomeFasta : %s\n', rawTranscriptomeFasta);
         fprintf(logFID, 'fpkmPath : %s\n', fpkmPath);
         fprintf(logFID, 'ncRNAPath : %s\n', ncRNAPath);
@@ -838,6 +846,27 @@ function MERFISHProbeDesign(varargin)
         % Slice transcriptome
         slicedTranscriptome = transcriptome.Slice('geneID', goodIDs);
 
+		fprintf(1, '%s - Sliced transcriptome\n', datestr(datetime));
+        fprintf(logFID, '%s - Sliced transcriptome\n', datestr(datetime));
+		
+		% Having memory errors after this part.  
+		% What is needed here?
+		% slicedTranscriptome
+		% OTrRNA15
+		% specificityTable
+		% isoSpecificityTable
+		%
+		% Needed in memory to pass to TRDesigner
+		
+		
+		% NOT NEEDED
+		% transcriptome
+		%
+		%
+		% Can clear transcriptome object from memory at this point
+		clear transcriptome;
+		
+		
         %% Create Target Region Designer object
         if ~exist(trDesignerPath)
 
@@ -864,6 +893,18 @@ function MERFISHProbeDesign(varargin)
         %% ------------------------------------------------------------------------
         % Create target regions for a specific set of probe properties
         %%-------------------------------------------------------------------------
+        
+        
+        
+        % Apparent that if trRegionsPath object exists and is correct, nothing upstream needs to be loaded.
+		% Problem is that TRDesigner object does not carry relevant info to validate loaded vs to-build object.
+        % right now trusting that if path exists w/ correct parameters,
+        % then rest is OK.  
+		% If this could be done, then trDesignerPathOK check should be done first, then cascade backwards to transcriptomePathOK check,
+		% then loading only what is not complete. 
+        % Internal hash to make? 
+        
+        
         if ~exist(trRegionsPath)
             % Design target regions
         % 	targetRegions = trDesigner.DesignTargetRegions(...
@@ -1283,6 +1324,13 @@ function MERFISHProbeDesign(varargin)
             fprintf(logFID, '%s - Completed in %d s\n', datestr(datetime), toc(writeTimer));
             
             if keepAllPossibleProbes
+                if obj.debugMode
+                    assignin('base', 'allHeaders', allHeaders);
+                    assignin('base', 'allSeqs', allSeqs);
+                end
+                
+                allSeqs(cellfun(@isempty, allHeaders)) = [];
+                allHeaders(cellfun(@isempty, allHeaders)) = [];
                 
                 allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
                 
@@ -1449,6 +1497,16 @@ function MERFISHProbeDesign(varargin)
         fclose(logFID);
         rethrow(er);
         return;
+    end
+    
+    if debugMode
+        % Debug mode transfers all variables in this workspace into base
+        % workspace
+        myVarList=who;
+
+        for indVar = 1:length(myVarList)
+            assignin('base',myVarList{indVar},eval(myVarList{indVar}))
+        end
     end
     
     display('Script completed!');

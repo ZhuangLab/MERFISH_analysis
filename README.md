@@ -43,9 +43,9 @@ Readouts.fasta file
 ./MERFISH_anlaysis/MERFISH_Examples2/readoutsHypothalamus.fasta
 
 
-Proxy bulk sequencing file (created with ./MERFISH_anlaysis/MERFISH_Examples2/libraryDesign/makeFPKMfileFromCodebook.m):
+Proxy bulk sequencing file (created with ./mFISHcodebookPermutation/makeProxyFPKMfileFromRefSeqfile.py):
 
-./MERFISH_anlaysis/MERFISH_Examples2/Mus_musculus_proxy.fpkm_tracking
+./MERFISH_analysis/MERFISH_Examples2/Mus_musculus_proxy.fpkm_tracking
 
 
 Requires all sub-folders of this repo be on MATLAB path to execute.

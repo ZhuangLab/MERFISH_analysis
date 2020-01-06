@@ -52,11 +52,13 @@ classdef probeDesign < matlab.mixin.SetGet
         cutPrimersMaxHomologyCross {mustBeNumeric, mustBeNonnegative} = 8;
 
         % Indicate if this is allowed to ignore sequence version number in matching
-        versionMatch {mustBeNumericOrLogical} = false;
+        versionMatch {mustBeNumericOrLogical} = true;
         
-        doubleHeadedsmELT {mustBeNumericOrLogical} = false;
+        doubleHeadedsmELT {mustBeNumericOrLogical} = true;
         
         keepAllPossibleProbes {mustBeNumericOrLogical} = true;
+        
+        debugMode {mustBeNumericOrLogical} = false;
         
         %---------------------------------------------------------------
         % Generated paths that could be reused if existing, things match
@@ -181,7 +183,8 @@ classdef probeDesign < matlab.mixin.SetGet
                           'transcriptomePath', ...
                           'specificityTablePath', ...
                           'isoSpecificityTablePath', ...
-                          'trDesignerPath'}
+                          'trDesignerPath', ...
+						  'species'}
                         
                         if all(isstrprop(ret{2}, 'digit') | (ret{2} == '.') | (ret{2} == 'e') | (ret{2} == '-'))
                             obj.(ret{1}) = str2double(ret{2});
@@ -232,7 +235,7 @@ classdef probeDesign < matlab.mixin.SetGet
                         obj.versionMatch = (ret{2} == '1');
 
                     case 'doubleHeadedsmELT'
-                        assignin('base', 'line2', ret)
+                        % assignin('base', 'line2', ret)
                         obj.doubleHeadedsmELT = (ret{2} == '1');
                         
                 end

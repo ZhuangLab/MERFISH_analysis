@@ -17,6 +17,7 @@ classdef TRDesigner < handle
 % -------------------------------------------------------------------------
 properties 
     verbose 	% A boolean that determines whether the class displays progress
+    debugMode   % boolean for extra debug features
 end
 
 properties (SetAccess=protected)
@@ -67,6 +68,7 @@ methods
         % Define defaults
         defaults = cell(0,3); 
         defaults(end+1,:) = {'verbose', 'boolean', true}; % Display progress of construction
+        defaults(end+1,:) = {'debugMode', 'boolean', false}; % Display progress of construction
         defaults(end+1,:) = {'transcriptome', 'freeType', []};
         defaults(end+1,:) = {'OTTables', 'freeType', []};
         defaults(end+1,:) = {'OTTableNames', 'cell', {}};
@@ -1009,11 +1011,24 @@ methods
         % -------------------------------------------------------------------------
         % Loop over objects in parallel
         % -------------------------------------------------------------------------
+        
+        
+        if obj.debugMode
+            fprintf(1, 'Assigning TRDesigner variables in main workspace.\n');
+            assignin('base', 'targetRegionsBuilding', targetRegions);
+        end
+        
         parfor (i=1:length(inds), obj.numPar)   % Get out of memory errors in this section
                                                 % Maybe because portions
                                                 % continue to get added to
                                                 % localProps instead of
                                                 % pre-allocated?
+                                                
+            
+            if obj.debugMode
+                fprintf(1, 'Building region %d.\n', i); 
+            end
+            
             % Compile region properties
             regionProps = zeros(6,0);
             for l=1:length(regionLength)
@@ -1030,9 +1045,17 @@ methods
                 end
             end
             
+            if obj.debugMode
+                fprintf(1, 'Complete region props for %d.\n', i);
+            end
+            
             % Tile regions and return properties of selected regions
             selectedRegionProps = TRDesigner.TileRegions(regionProps, ...
                 threePrimeSpace);
+            
+            if obj.debugMode
+                fprintf(1, 'Tiled regions for region %d.\n', i);
+            end
             
             % Build a new target region object
             newTR = TargetRegions('id', ids{i}, ...
@@ -1045,14 +1068,33 @@ methods
                 'specificity',selectedRegionProps(5,:), ...
                 'isoSpecificity', selectedRegionProps(6,:));
             
+            if obj.debugMode
+                fprintf(1, 'Built target regions for region %d.\n', i);
+            end
+            
             % Append to growing list of target regions
             targetRegions{i} = newTR;
+            
+            
+            if obj.debugMode
+                fprintf(1, 'Appended target regions for region %d.\n', i);
+            end
         end
         
         % -------------------------------------------------------------------------
         % Flatten objects
         % -------------------------------------------------------------------------
-        targetRegions = [targetRegions{:}];
+        if obj.debugMode
+            fprintf(1, 'Flattening target regions...');
+        end
+        try
+            targetRegions = [targetRegions{:}];
+            fprintf(1, 'Done!\n');
+        catch me
+            fprintf(1, 'Error!\n');
+            rethrow(me);
+        end
+        
         
         % -------------------------------------------------------------------------
         % Display progress
