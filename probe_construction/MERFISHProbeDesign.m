@@ -1036,7 +1036,7 @@ function MERFISHProbeDesign(varargin)
         
         if keepGoingFlag
             oligos = [];
-
+            allOligos = [];
             lastGene = '';
             
             if keepAllPossibleProbes
@@ -1256,14 +1256,16 @@ function MERFISHProbeDesign(varargin)
                         for s=1:length(indsToKeepForReal)
                             oligos(end+1).Header = headers{indsToKeepForReal(s)};
                             oligos(end).Sequence = seqs{indsToKeepForReal(s)};
+                            allOligos(end+1).Header = headers{length(headers)};
+                            allOligos(end).Sequence = seqs{length(seqs)};
                         end
                         
-                        if keepAllPossibleProbes
+                        %if keepAllPossibleProbes
                             % Append all headers + seqs to cell
-                            allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
-                            allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
-                            seqCount = seqCount + length(seqs);
-                        end
+                         %   allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
+                          %  allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
+                           % seqCount = seqCount + length(seqs);
+                        %end
 
 
                     else
@@ -1288,7 +1290,7 @@ function MERFISHProbeDesign(varargin)
             
             if keepAllPossibleProbes
                 
-                allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
+                %allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
                 
                 PageBreak();
                 fprintf(1, 'Writing: %s\n', allOligosPath);
