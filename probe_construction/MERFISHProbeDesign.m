@@ -1256,8 +1256,8 @@ function MERFISHProbeDesign(varargin)
                         for s=1:length(indsToKeepForReal)
                             oligos(end+1).Header = headers{indsToKeepForReal(s)};
                             oligos(end).Sequence = seqs{indsToKeepForReal(s)};
-                            allOligos(end+1).Header = headers{length(headers)};
-                            allOligos(end).Sequence = seqs{length(seqs)};
+                            allOligos(end+1).Header = headers{1:length(headers)};
+                            allOligos(end).Sequence = seqs{1:length(seqs)};
                         end
                         
                         %if keepAllPossibleProbes
