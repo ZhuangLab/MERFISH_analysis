@@ -1061,7 +1061,7 @@ function MERFISHProbeDesign(varargin)
                % seqCount = 1;
             %end
 
-            for i=1:length(finalGenes)
+            for i=1:length(finalIds)
                 % Save local gene
                 localGeneName = finalGenes{i};
 
@@ -1191,7 +1191,6 @@ function MERFISHProbeDesign(varargin)
                             indsToKeep = find(~hasrRNAPenalty);
                             indsToRemove = setdiff(1:length(seqs), indsToKeep);
                             display(['... removing ' num2str(length(indsToRemove)) ' probes']);
-                            
                             fprintf(logFID, '%s - Removing %d probes\n', datestr(datetime), length(indsToRemove));
                             for r=1:length(indsToRemove)
                                 display(['...     ' headers{indsToRemove(r)}]);
@@ -1203,10 +1202,7 @@ function MERFISHProbeDesign(varargin)
                             indsToKeepForReal =  indsToKeep;
                         end
                            indsToKeepForAll = indsToKeepForReal(1:length(indsToKeepForReal));
-                        
                         indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
-                        
-                      
                         display(['... keeping ' num2str(length(indsToKeepForReal)) ' probes']);
                         fprintf(logFID, '%s - Retaining %d probes\n', datestr(datetime), length(indsToKeepForReal));
 
