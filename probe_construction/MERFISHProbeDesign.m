@@ -505,7 +505,13 @@ function MERFISHProbeDesign(varargin)
     badFilesFound = filePathCheck(pathsToCheck);
     
     if badFilesFound
-        error('Address file path issues and restart processing.');
+        delete(usedReadoutPath)
+        delete(possibleOligosPath)
+        delete(oligosPath)
+        delete(primersPath)
+        delete(finalPrimersPath)
+        delete(allOligosPath)
+        %error('Address file path issues and restart processing.');
     end
                    
     % Start logging
@@ -916,7 +922,11 @@ function MERFISHProbeDesign(varargin)
 
             fprintf(logFID, '%s - Target regions loaded from %s\n', datestr(datetime), trRegionsPath);
         end
-
+        %write the genename
+        genenames={targetRegions.geneName}';
+        geneids={targetRegions.id}';
+        numRegions={targetRegions.numRegions}';
+        writetable(table(genenames,geneids,numRegions),[analysisSavePath 'targetRegionsHuman.csv'],'WriteRowNames',false)
         %% ------------------------------------------------------------------------
         % Step 2: Compile the library 
         %  The target regions designed above will be compiled into template
@@ -964,7 +974,13 @@ function MERFISHProbeDesign(varargin)
 
         finalGenes = {codebook.name}; % Extract gene common names from codebook
         barcodes = char({codebook.barcode}) == '1'; % Extract string barcodes and convert to logical matrix
-
+        %check if gene and ids match the reference
+        genes_from_ids=targetRegions(ismember({targetRegions.id}, finalIds));
+        genenames=targetRegions(ismember({targetRegions.geneName}, finalGenes));
+        if length(setdiff({genenames.geneName},{genes_from_ids.geneName}))>0
+        warning([char(setdiff({genenames.geneName},{genes_from_ids.geneName})),' ',char(setdiff({genes_from_ids.id},{genenames.id})),' is different from the reference']);
+        fprintf(logFID, ['WARNING! ', char(setdiff({genenames.geneName},{genes_from_ids.geneName})),' ',char(setdiff({genes_from_ids.id},{genenames.id})),' is different from the reference\n']);
+        end
 
         if versionMatch
             finalTargetRegions = targetRegions(ismember({targetRegions.id}, finalIds)); % Extract only the desired target regions
@@ -1036,16 +1052,16 @@ function MERFISHProbeDesign(varargin)
         
         if keepGoingFlag
             oligos = [];
-
+            allOligos = [];
             lastGene = '';
             
-            if keepAllPossibleProbes
-                allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
-                allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
-                seqCount = 1;
-            end
+            %if keepAllPossibleProbes
+             %   allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+              %  allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+               % seqCount = 1;
+            %end
 
-            for i=1:length(finalIds)
+            for i=1:length(finalGenes)
                 % Save local gene
                 localGeneName = finalGenes{i};
 
@@ -1062,7 +1078,7 @@ function MERFISHProbeDesign(varargin)
 
                     % Determine targetRegion sequences
                     tRegionPull = finalTargetRegions(strcmp({finalTargetRegions.geneName}, localGeneName));
-
+                    
 
                     if ~isempty(tRegionPull) % Check to see if there are no target regions--only used for blanks
 
@@ -1175,6 +1191,7 @@ function MERFISHProbeDesign(varargin)
                             indsToKeep = find(~hasrRNAPenalty);
                             indsToRemove = setdiff(1:length(seqs), indsToKeep);
                             display(['... removing ' num2str(length(indsToRemove)) ' probes']);
+                            
                             fprintf(logFID, '%s - Removing %d probes\n', datestr(datetime), length(indsToRemove));
                             for r=1:length(indsToRemove)
                                 display(['...     ' headers{indsToRemove(r)}]);
@@ -1182,11 +1199,14 @@ function MERFISHProbeDesign(varargin)
 
             %                 display(indsToKeep)
 
-                            indsToKeepForReal = [indsToKeepForReal, indsToKeep];
-
+                            %indsToKeepForReal = [indsToKeepForReal, indsToKeep];
+                            indsToKeepForReal =  indsToKeep;
                         end
-
+                           indsToKeepForAll = indsToKeepForReal(1:length(indsToKeepForReal));
+                        
                         indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
+                        
+                      
                         display(['... keeping ' num2str(length(indsToKeepForReal)) ' probes']);
                         fprintf(logFID, '%s - Retaining %d probes\n', datestr(datetime), length(indsToKeepForReal));
 
@@ -1257,13 +1277,16 @@ function MERFISHProbeDesign(varargin)
                             oligos(end+1).Header = headers{indsToKeepForReal(s)};
                             oligos(end).Sequence = seqs{indsToKeepForReal(s)};
                         end
-                        
-                        if keepAllPossibleProbes
-                            % Append all headers + seqs to cell
-                            allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
-                            allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
-                            seqCount = seqCount + length(seqs);
+                            for s=1:length(indsToKeepForAll)
+                            allOligos(end+1).Header = headers{indsToKeepForAll(s)};
+                            allOligos(end).Sequence = seqs{indsToKeepForAll(s)};
                         end
+                        %if keepAllPossibleProbes
+                            % Append all headers + seqs to cell
+                         %   allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
+                          %  allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
+                           % seqCount = seqCount + length(seqs);
+                        %end
 
 
                     else
@@ -1288,7 +1311,7 @@ function MERFISHProbeDesign(varargin)
             
             if keepAllPossibleProbes
                 
-                allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
+                %allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
                 
                 PageBreak();
                 fprintf(1, 'Writing: %s\n', allOligosPath);
