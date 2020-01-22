@@ -56,38 +56,27 @@
  %   display('Error on MTG_20191220_fromLog2');
 %end
 % 
-% pd = probeDesign('Mouse_VISp_Barcoded_20200102', 'mouse', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_VISp152JLC_barcoded.csv');
-% set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0, 1], 'specificity', [0.75, 1], 'numProbesPerGene', 92);
-% set(pd, 'probeSpacing', -20);  
-% set(pd, 'ncRNAPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.ncrna.fa')
-% set(pd, 'FPKMabundanceThreshold', 0);
-% set(pd, 'rawTranscriptomeFasta','D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.cdna.all.fa');
-% set(pd, 'fpkmPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_proxyRandomFPKM.fpkm_tracking');
-% 
-% pd.buildLibrary()
+%pd = probeDesign('Mouse_VISp_Barcodedalt_20200118', 'mouse', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_VISp152JLC_barcoded_altered20200115.csv');
+%set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0, 1], 'specificity', [0.75, 1], 'numProbesPerGene', 92);
+%set(pd, 'probeSpacing', -20);  
+%set(pd, 'ncRNAPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.ncrna.fa')
+%set(pd, 'FPKMabundanceThreshold', 0);
+%set(pd, 'rawTranscriptomeFasta','D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.cdna.all.fa');
+%set(pd, 'fpkmPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_proxyRandomFPKM.fpkm_tracking');
 
 
-%try
-%    pd = probeDesign();
- %   pd.matchLogFile('D:\Data\MERFISH\Homosapiens\MTG_20191221seq_fromLog\MTG_20191221seq_fromLog.log');
-  %  set(pd, 'libraryName', 'MTG_20191221seq_fromLog_20200104', 'species', 'Homo sapiens');
-   % pd.buildLibrary();
-    %display('Completed sequential');
-%catch mError
- %   display('Build error in executeProbeDesign');
-  %  rethrow(mError)
-%end
 
-
-pd = probeDesign('Mouse_VISp_Barcoded_20200105', 'mouse', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_VISp152JLC_barcoded.csv');
-set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0, 1], 'specificity', [0.75, 1], 'numProbesPerGene', 92);
-set(pd, 'probeSpacing', -20);  
-set(pd, 'ncRNAPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.ncrna.fa')
-set(pd, 'FPKMabundanceThreshold', 0);
-set(pd, 'rawTranscriptomeFasta','D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.cdna.all.fa');
-set(pd, 'fpkmPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_proxyRandomFPKM.fpkm_tracking');
-
+pd = probeDesign();
+logFilePath='D:\Data\MERFISH\Musmusculus\Mouse_VISp_Barcodedalt_20200118\Mouse_VISp_Barcodedalt_20200118.log'
+pd.matchLogFile(logFilePath);
+set(pd, 'libraryName', 'Mouse_VISp_Barcodealt_from010120log');
 pd.buildLibrary()
+
+
+ 
+
+
+
 
 
 

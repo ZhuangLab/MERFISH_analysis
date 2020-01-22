@@ -236,7 +236,7 @@ classdef probeDesign < matlab.mixin.SetGet
 
                     case 'doubleHeadedsmELT'
                         % assignin('base', 'line2', ret)
-                        obj.doubleHeadedsmELT = (ret{2} == '1');
+                        obj.doubleHeadedsmELT = (ret{2} == '0');
                         
                 end
             end
