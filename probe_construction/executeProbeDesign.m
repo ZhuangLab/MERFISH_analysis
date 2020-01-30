@@ -62,7 +62,7 @@
 % 
 pd = probeDesign();
 pd.matchLogFile('D:\Data\MERFISH\Musmusculus\Mouse_VISp_Barcodealt_from010120log\Mouse_VISp_Barcodealt_from010120log.log');
-set(pd, 'libraryName', 'MouseVISp_memErrorTesting');
+set(pd, 'libraryName', 'MouseVISp_memErrorTesting_v2', 'specifyReadouts', true, 'keepAllPossibleProbes', true, 'debugMode', true);
 pd.buildLibrary()
 
 

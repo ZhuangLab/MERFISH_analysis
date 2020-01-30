@@ -871,6 +871,7 @@
 		% Can clear transcriptome object from memory at this point
 		clear transcriptome;
 		
+        
 		
         %% Create Target Region Designer object
         if ~exist(trDesignerPath)
@@ -899,6 +900,12 @@
         % Create target regions for a specific set of probe properties
         %%-------------------------------------------------------------------------
         
+        % Can clear large objects from memory at this point
+        clear specificityTable
+        clear isoSpecificityTable
+        clear slicedTranscriptome
+%         clear OTrRNA15   - used to calc penalties for ncRNA later! 
+        drawnow;
         
         
         % Apparent that if trRegionsPath object exists and is correct, nothing upstream needs to be loaded.
@@ -928,7 +935,7 @@
         % 		'specificity', [0.75 1], ...
         % 		'OTTables', {'rRNA', [0, 0]});
 
-            fprintf(logFID, '%s - Designing target regions %s\n', datestr(datetime));
+            fprintf(logFID, '%s - Designing target regions\n', datestr(datetime));
 
                 targetRegions = trDesigner.DesignTargetRegions(...
                 'regionLength', regionDesignParameters.regionLength, ...
@@ -939,7 +946,8 @@
                 'monovalentSalt', regionDesignParameters.monovalentSaltConcentration, ...
                 'probeConc', regionDesignParameters.probeConcentration, ...
                 'threePrimeSpace', regionDesignParameters.probeSpacing, ...
-                'OTTables', {'rRNA', [0, 0]});
+                'OTTables', {'rRNA', [0, 0]},...
+                'debugMode', debugMode);
 
                     % NOTE: The ranges above were determined empirically to strike 
                     % the proper balance between stringency (narrow ranges) and 
@@ -995,10 +1003,10 @@
            
         
         if specifyReadouts
-           %% ------------------------------------------------------------------------
+        % ------------------------------------------------------------------------
         % Select readouts from readouts.fasta file
         % Put in order as specified from codebook
-        %%------------------------------------------------------------------------- 
+        %------------------------------------------------------------------------- 
         
         fprintf(logFID, '%s - Trimming readouts to specified list from codebook.\n', datestr(datetime), codebookPath);
         
@@ -1032,10 +1040,10 @@
         end
         
   
-        %% ------------------------------------------------------------------------
+        % ------------------------------------------------------------------------
         % Select isoforms
-        %%-------------------------------------------------------------------------
-        %% Identify the isoforms to keep from those requested in the codebook
+        %-------------------------------------------------------------------------
+        % Identify the isoforms to keep from those requested in the codebook
         finalIds = {codebook.id}; % Extract isoform ids from codebook
 
         % For codebooks that use a transcript spanning multiple IDs, there is a
