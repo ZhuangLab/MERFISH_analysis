@@ -89,6 +89,9 @@ for i=1:length(parameterNames)
     % ---------------------------------------------------------------------
     ind = find(strcmp(defaults(:,1), parameterNames{i}));
     if isempty(ind)
+        
+        fprintf(1, '%s\n', defaults{:,ind});
+        
         error('matlabSTORM:invalidParameters', ... 
             [parameterNames{i} ' is not a valid parameters flag for ' mfileName]);
     end
