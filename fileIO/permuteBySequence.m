@@ -23,7 +23,7 @@
 function [returnPermutation, whichPerm] = permuteBySequence(sequence, nOutputsPossible, nBins)
 
     readoutPerms = perms(1:nOutputsPossible);
-    whichPerm = mod(11*sum(sequence), size(readoutPerms, 1)) + 1;
+    whichPerm = mod(sum(sequence), size(readoutPerms, 1)) + 1;
     
     returnPermutation = readoutPerms(whichPerm, 1:nBins);
 end

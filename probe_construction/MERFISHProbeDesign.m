@@ -147,6 +147,11 @@
         
         debugMode = false;
         
+        readoutPermuteBySequence = true; % If true, use fileIO/permuteBySequence to define readout order on a sequence
+                                         % If false, use default behavior
+                                         % where randPerm defines readout
+                                         % order.
+        
     elseif (nargin == 1) && isa(varargin{1}, 'probeDesign')
         
         obj = varargin{1};
@@ -237,6 +242,8 @@
         specifyReadouts = obj.specifyReadouts;
         
         debugMode = obj.debugMode;
+        
+        readoutPermuteBySequence = obj.readoutPermuteBySequence;
         
     else
         error('MERFISHProbeDesign inputs incorrect.');
@@ -582,6 +589,7 @@
         fprintf(logFID, 'doubleHeadedsmELT : %d\n', doubleHeadedsmELT);
         fprintf(logFID, 'keepAllPossibleProbes : %d\n', keepAllPossibleProbes);
         fprintf(logFID, 'specifyReadouts : %d\n', specifyReadouts);
+        fprintf(logFID, 'readoutPermuteBySequence : %d\n', readoutPermuteBySequence);
         fprintf(logFID, '-----------------------------\n');
 
 
@@ -1201,13 +1209,25 @@
                                     localReadouts(3) = possibleReadouts(2);
                                     
                                 else
-                                    % Create random orientation and selection of readouts
-                                    localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                                    
+                                    if readoutPermuteBySequence
+                                        % Use permuteBySequence to generate
+                                        % pseudo-random readout order
+                                        [readoutOrder, whichPermute] = permuteBySequence(uint8(tRegion.sequence{nR}), sum(barcodes(i, :)), 3);
+                                        localReadouts = possibleReadouts(readoutOrder); 
+                                        % Use whichPermute to decide which
+                                        % side has 2 readouts vs 1 readout.
+                                        longSide = mod(whichPermute, 2) == 0;
+                                    else
+                                        % Create random orientation and selection of readouts
+                                        localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                                        longSide = rand(1);
+                                    end
                                 end
 
 
 
-                                if rand(1) > 0.5
+                                if longSide > 0.5
                                     % Create header 
                                     headers{p} = [libraryName ' ' ...
                                         localReadouts(1).Header ' ' ...
