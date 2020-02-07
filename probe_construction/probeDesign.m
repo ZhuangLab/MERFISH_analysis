@@ -60,6 +60,8 @@ classdef probeDesign < matlab.mixin.SetGet
         
         debugMode {mustBeNumericOrLogical} = false;
         
+        readoutPermuteBySequence {mustBeNumericOrLogical} = true;
+        
         % Use readouts explicitly specified in codebook file header as
         % bit_names
         % If false, use default readout ordering (first N sequences/names
@@ -249,6 +251,9 @@ classdef probeDesign < matlab.mixin.SetGet
                     
                     case 'specifyReadouts'
                         obj.specifyReadouts = (ret{2} == '0');
+                        
+                    case 'readoutPermuteBySequence'
+                        obj.readoutPermuteBySequence = (ret{2} == '0');
                         
                 end
             end
