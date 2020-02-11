@@ -505,13 +505,7 @@ function MERFISHProbeDesign(varargin)
     badFilesFound = filePathCheck(pathsToCheck);
     
     if badFilesFound
-        delete(usedReadoutPath)
-        delete(possibleOligosPath)
-        delete(oligosPath)
-        delete(primersPath)
-        delete(finalPrimersPath)
-        delete(allOligosPath)
-        %error('Address file path issues and restart processing.');
+        error('Address file path issues and restart processing.');
     end
                    
     % Start logging
@@ -721,23 +715,23 @@ function MERFISHProbeDesign(varargin)
                     fprintf(logFID, '%s - Gene %d of %d. First transcript %s\n', datestr(datetime), i, length(names), idsByName{i}{1});
                 end
 
-              %  if useUniformWeights
+                if useUniformWeights
 
                     % Generate a OTTable for isoforms for the given gene
                     isoSpecificityTables(i) = OTTable(localTranscriptome, ...
                         isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
                         'verbose', false, ...
-                        'transferAbund', true);
+                        'transferAbund', false);
 
-               % else
+                else
 
                     % Generate a OTTable for isoforms for the given gene
-                %    isoSpecificityTables(i) = OTTable(localTranscriptome, ...
-                 %       isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
-                  %      'verbose', false, ...
-                   %     'transferAbund', true);
+                    isoSpecificityTables(i) = OTTable(localTranscriptome, ...
+                       isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
+                        'verbose', false, ...
+                        'transferAbund', true);
 
-               % end
+                end
 
                 % Name the table
                 isoSpecificityTables(i).name = names{i}; 
@@ -1079,7 +1073,7 @@ function MERFISHProbeDesign(varargin)
                     % Determine targetRegion sequences
                     tRegionPull = finalTargetRegions(strcmp({finalTargetRegions.geneName}, localGeneName));
                     
-
+                    
                     if ~isempty(tRegionPull) % Check to see if there are no target regions--only used for blanks
 
                         seqs = {};
@@ -1126,14 +1120,12 @@ function MERFISHProbeDesign(varargin)
                                     
                                 else
                                     % Create random orientation and selection of readouts
-                                    %localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
-                                     localReadouts = possibleReadouts([1 2 3]);
+                                    localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
                                 end
 
 
 
-                                %if rand(1) > 0.5
-                                if 0.2 >0.5 
+                                if rand(1) > 0.5
                                 % Create header 
                                     headers{p} = [libraryName ' ' ...
                                         localReadouts(1).Header ' ' ...
