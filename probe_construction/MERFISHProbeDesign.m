@@ -719,8 +719,7 @@ function MERFISHProbeDesign(varargin)
 
                     % Generate a OTTable for isoforms for the given gene
                     isoSpecificityTables(i) = OTTable(localTranscriptome, ...
-                        isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
-                        'verbose', false, ...
+                        isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties                        'verbose', false, ...
                         'transferAbund', false);
 
                 else
@@ -1072,8 +1071,8 @@ function MERFISHProbeDesign(varargin)
 
                     % Determine targetRegion sequences
                     tRegionPull = finalTargetRegions(strcmp({finalTargetRegions.geneName}, localGeneName));
-                    
-                    
+
+
                     if ~isempty(tRegionPull) % Check to see if there are no target regions--only used for blanks
 
                         seqs = {};
@@ -1126,7 +1125,7 @@ function MERFISHProbeDesign(varargin)
 
 
                                 if rand(1) > 0.5
-                                % Create header 
+                                    % Create header 
                                     headers{p} = [libraryName ' ' ...
                                         localReadouts(1).Header ' ' ...
                                         tRegion.geneName '__' ...
