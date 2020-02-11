@@ -60,6 +60,12 @@ classdef probeDesign < matlab.mixin.SetGet
         
         debugMode {mustBeNumericOrLogical} = false;
         
+        % Use readouts explicitly specified in codebook file header as
+        % bit_names
+        % If false, use default readout ordering (first N sequences/names
+        % in readout.fasta file)
+        specifyReadouts {mustBeNumericOrLogical} = true;
+        
         %---------------------------------------------------------------
         % Generated paths that could be reused if existing, things match
         % 
@@ -236,7 +242,13 @@ classdef probeDesign < matlab.mixin.SetGet
 
                     case 'doubleHeadedsmELT'
                         % assignin('base', 'line2', ret)
-                        obj.doubleHeadedsmELT = (ret{2} == '1');
+                        obj.doubleHeadedsmELT = (ret{2} == '0');
+                        
+                    case 'keepAllPossibleProbes'
+                        obj.keepAllPossibleProbes = (ret{2} == '0');
+                    
+                    case 'specifyReadouts'
+                        obj.specifyReadouts = (ret{2} == '0');
                         
                 end
             end

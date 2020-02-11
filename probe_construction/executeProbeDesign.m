@@ -39,55 +39,40 @@
 
 %try
  %   pd = probeDesign();
-  %  logFilePath = 'D:\Data\MERFISH\Homosapiens\Human_MTG_Sequential_20191217_DHS\Human_MTG_Sequential_20191217_DHS.log';
+  %  logFilePath = 'D:\Data\MERFISH\Homosapiens\Human_MTG_corrected3_barcoded_20200111b_actually sequential\Human_MTG_corrected3_barcoded_20200111b.log';
    % pd.matchLogFile(logFilePath);
-    %set(pd, 'libraryName', 'MTG_20191220seq_fromLog', 'species', 'Homo sapiens');
+    %set(pd, 'libraryName', 'Human_MTG_corrected3_sequential_20200121', 'species', 'Homo sapiens');
     %pd.buildLibrary();
     %display('Completed sequential');
+
 %catch mError
- %   display('Error on MTG_20191220_fromLog');
+ %   display('Error on Human_MTG_corrected3_sequential_20200121');
 %end
 
-%try
- %   pd = probeDesign('Human_MTG_Barcoded_20191220', 'human', 'D:\Data\MERFISH\Homosapiens\Human_MTG_Panel1_barcoded2.csv');
-  %  pd.buildLibrary();
-   % display('Completed barcoded');
+%try 
+ %   pd = probeDesign();
+  %  logFilePath = 'D:\Data\MERFISH\Homosapiens\Human_MTG_barcoded_20200114\Human_MTG_barcoded_20200114.log';
+   % pd.matchLogFile(logFilePath);
+    %set(pd, 'libraryName', 'Human_MTG_barcoded_202000121', 'species', 'human');
+    %pd.buildLibrary();
+    %display('Completed barcoded');
 %catch mError
- %   display('Error on MTG_20191220_fromLog2');
+ %   display('Error on Human_MTG_barcoded_202000121');
 %end
 % 
-% pd = probeDesign('Mouse_VISp_Barcoded_20200102', 'mouse', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_VISp152JLC_barcoded.csv');
-% set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0, 1], 'specificity', [0.75, 1], 'numProbesPerGene', 92);
-% set(pd, 'probeSpacing', -20);  
-% set(pd, 'ncRNAPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.ncrna.fa')
-% set(pd, 'FPKMabundanceThreshold', 0);
-% set(pd, 'rawTranscriptomeFasta','D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.cdna.all.fa');
-% set(pd, 'fpkmPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_proxyRandomFPKM.fpkm_tracking');
-% 
-% pd.buildLibrary()
-
-
-%try
-%    pd = probeDesign();
- %   pd.matchLogFile('D:\Data\MERFISH\Homosapiens\MTG_20191221seq_fromLog\MTG_20191221seq_fromLog.log');
-  %  set(pd, 'libraryName', 'MTG_20191221seq_fromLog_20200104', 'species', 'Homo sapiens');
-   % pd.buildLibrary();
-    %display('Completed sequential');
-%catch mError
- %   display('Build error in executeProbeDesign');
-  %  rethrow(mError)
-%end
-
-
-pd = probeDesign('Mouse_VISp_Barcoded_20200105', 'mouse', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_VISp152JLC_barcoded.csv');
-set(pd, 'regionGC', [0.43, 0.63], 'regionTm', [66,76], 'isoSpecificity', [0, 1], 'specificity', [0.75, 1], 'numProbesPerGene', 92);
-set(pd, 'probeSpacing', -20);  
-set(pd, 'ncRNAPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.ncrna.fa')
-set(pd, 'FPKMabundanceThreshold', 0);
-set(pd, 'rawTranscriptomeFasta','D:\Data\MERFISH\Musmusculus\Mus_musculus.GRCm38.cdna.all.fa');
-set(pd, 'fpkmPath', 'D:\Data\MERFISH\Musmusculus\Mus_musculus_proxyRandomFPKM.fpkm_tracking');
-
+pd = probeDesign();
+pd.matchLogFile('D:\Data\MERFISH\Musmusculus\Mouse_VISp_Barcodealt_from010120log\Mouse_VISp_Barcodealt_from010120log.log');
+set(pd, 'libraryName', 'MouseVISp_memErrorTesting_v2', 'specifyReadouts', true, 'keepAllPossibleProbes', true, 'debugMode', true);
 pd.buildLibrary()
+
+
+
+
+
+ 
+
+
+
 
 
 

@@ -812,6 +812,7 @@ methods
         defaults(end+1,:) = {'includeSequence', 'boolean', true};
         defaults(end+1,:) = {'threePrimeSpace', 'integer', 0};
         defaults(end+1,:) = {'removeForbiddenSeqs', 'boolean', false};
+        defaults(end+1,:) = {'debugMode', 'boolean', false};
         
         % Parse variable inputs
         parameters = ParseVariableArguments(varargin, defaults, mfilename);
@@ -840,7 +841,7 @@ methods
         % -------------------------------------------------------------------------
         % Initialize variables for loops
         % -------------------------------------------------------------------------
-        targetRegions = [];
+%         targetRegions = [];
         indsToKeep = cell(length(parameters.regionLength), length(inds));
         
         % -------------------------------------------------------------------------
@@ -1001,7 +1002,7 @@ methods
         % -------------------------------------------------------------------------
         % Prepare variables for parfor
         % -------------------------------------------------------------------------
-        targetRegions = cell(1, length(inds));
+%         targetRegions = cell(1, length(inds)); % Do not pre-allocate as cell
         regionLength = parameters.regionLength;
         threePrimeSpace = parameters.threePrimeSpace;
         ids = obj.transcriptome.ids(inds);
@@ -1013,10 +1014,30 @@ methods
         % -------------------------------------------------------------------------
         
         
-        if obj.debugMode
-            fprintf(1, 'Assigning TRDesigner variables in main workspace.\n');
-            assignin('base', 'targetRegionsBuilding', targetRegions);
-        end
+%         if parameters.debugMode
+%             fprintf(1, 'Assigning TRDesigner variables in main workspace.\n');
+%             assignin('base', 'targetRegionsBuilding', targetRegions);
+%         end
+        
+        
+        % 20200129 memory error fix plan:
+        % Pre-allocate targetRegions to length of inds
+        % Remove need to flatten. 
+        % Flatten step looks to be where memory error would arise due to
+        % array duplication.
+        
+        % Initialize targetRegions object
+        targetRegions(length(inds)) = TargetRegions('geneName', '', ...
+            'id', '', ...
+            'sequence', {}, ...
+            'startPos', [], ...
+            'regionLength', [], ...
+            'GC', [], ...
+            'Tm', [], ...
+            'specificity', [], ...
+            'isoSpecificity', [], ...
+            'penalties', [], ...
+            'penaltyNames', {});
         
         parfor (i=1:length(inds), obj.numPar)   % Get out of memory errors in this section
                                                 % Maybe because portions
@@ -1025,7 +1046,7 @@ methods
                                                 % pre-allocated?
                                                 
             
-            if obj.debugMode
+            if parameters.debugMode
                 fprintf(1, 'Building region %d.\n', i); 
             end
             
@@ -1045,7 +1066,7 @@ methods
                 end
             end
             
-            if obj.debugMode
+            if parameters.debugMode
                 fprintf(1, 'Complete region props for %d.\n', i);
             end
             
@@ -1053,12 +1074,13 @@ methods
             selectedRegionProps = TRDesigner.TileRegions(regionProps, ...
                 threePrimeSpace);
             
-            if obj.debugMode
+            if parameters.debugMode
                 fprintf(1, 'Tiled regions for region %d.\n', i);
             end
             
             % Build a new target region object
-            newTR = TargetRegions('id', ids{i}, ...
+            % Directly address location in pre-allocated array of objects
+            targetRegions(i) = TargetRegions('id', ids{i}, ...
                 'geneName', geneNames{i}, ...
                 'geneSequence', intSequences{i}, ...
                 'startPos', selectedRegionProps(1,:), ...
@@ -1068,15 +1090,16 @@ methods
                 'specificity',selectedRegionProps(5,:), ...
                 'isoSpecificity', selectedRegionProps(6,:));
             
-            if obj.debugMode
+            if parameters.debugMode
                 fprintf(1, 'Built target regions for region %d.\n', i);
             end
             
             % Append to growing list of target regions
-            targetRegions{i} = newTR;
+            % No need to append as array is directly addressed
+%             targetRegions{i} = newTR;
             
             
-            if obj.debugMode
+            if parameters.debugMode
                 fprintf(1, 'Appended target regions for region %d.\n', i);
             end
         end
@@ -1084,14 +1107,17 @@ methods
         % -------------------------------------------------------------------------
         % Flatten objects
         % -------------------------------------------------------------------------
-        if obj.debugMode
+        if parameters.debugMode
             fprintf(1, 'Flattening target regions...');
+            fprintf(1, 'Assigning pre-flattened targetRegions variable in main workspace.\n');
+            assignin('base', 'targetRegionsNotFlat', targetRegions);
         end
         try
-            targetRegions = [targetRegions{:}];
-            fprintf(1, 'Done!\n');
+            % No need to flatten as array is already created.
+%             targetRegions = [targetRegions{:}];
+            fprintf(1, 'TargetRegions flattened!\n');
         catch me
-            fprintf(1, 'Error!\n');
+            fprintf(1, 'Error in flattening target regions!\n');
             rethrow(me);
         end
         
@@ -1100,7 +1126,7 @@ methods
         % Display progress
         % -------------------------------------------------------------------------
         if obj.verbose
-            display(['... completed in ' num2str(toc(timer2)) ' s']);
+            fprintf(1, '... completed in %s s\n', num2str(toc(timer2)));
         end        
     end
         

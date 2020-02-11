@@ -143,6 +143,8 @@
         
         keepAllPossibleProbes = true;
         
+        specifyReadouts = false;
+        
         debugMode = false;
         
     elseif (nargin == 1) && isa(varargin{1}, 'probeDesign')
@@ -231,6 +233,8 @@
         doubleHeadedsmELT = obj.doubleHeadedsmELT;
         
         keepAllPossibleProbes = obj.keepAllPossibleProbes;
+        
+        specifyReadouts = obj.specifyReadouts;
         
         debugMode = obj.debugMode;
         
@@ -577,6 +581,7 @@
         fprintf(logFID, 'maxHomologyCross : %d\n', primerDesignParameters.cutPrimers.maxHomologyCross);
         fprintf(logFID, 'doubleHeadedsmELT : %d\n', doubleHeadedsmELT);
         fprintf(logFID, 'keepAllPossibleProbes : %d\n', keepAllPossibleProbes);
+        fprintf(logFID, 'specifyReadouts : %d\n', specifyReadouts);
         fprintf(logFID, '-----------------------------\n');
 
 
@@ -866,6 +871,7 @@
 		% Can clear transcriptome object from memory at this point
 		clear transcriptome;
 		
+        
 		
         %% Create Target Region Designer object
         if ~exist(trDesignerPath)
@@ -894,6 +900,12 @@
         % Create target regions for a specific set of probe properties
         %%-------------------------------------------------------------------------
         
+        % Can clear large objects from memory at this point
+        clear specificityTable
+        clear isoSpecificityTable
+        clear slicedTranscriptome
+%         clear OTrRNA15   - used to calc penalties for ncRNA later! 
+        drawnow;
         
         
         % Apparent that if trRegionsPath object exists and is correct, nothing upstream needs to be loaded.
@@ -923,7 +935,7 @@
         % 		'specificity', [0.75 1], ...
         % 		'OTTables', {'rRNA', [0, 0]});
 
-            fprintf(logFID, '%s - Designing target regions %s\n', datestr(datetime));
+            fprintf(logFID, '%s - Designing target regions\n', datestr(datetime));
 
                 targetRegions = trDesigner.DesignTargetRegions(...
                 'regionLength', regionDesignParameters.regionLength, ...
@@ -934,7 +946,8 @@
                 'monovalentSalt', regionDesignParameters.monovalentSaltConcentration, ...
                 'probeConc', regionDesignParameters.probeConcentration, ...
                 'threePrimeSpace', regionDesignParameters.probeSpacing, ...
-                'OTTables', {'rRNA', [0, 0]});
+                'OTTables', {'rRNA', [0, 0]},...
+                'debugMode', debugMode);
 
                     % NOTE: The ranges above were determined empirically to strike 
                     % the proper balance between stringency (narrow ranges) and 
@@ -982,15 +995,55 @@
 
         fprintf(logFID, '%s - Loading codebook from %s\n', datestr(datetime), codebookPath);
 
-        codebook = LoadCodebook(codebookPath);
+        [codebook, codebookHeader] = LoadCodebook(codebookPath, 'verbose', true);
            % NOTE: A codebook should be defined before the library is constructed. 
            % NOTE: See the code_construction example script for instructions on how
            % to generate barcodes for different encoding schemes
+           
+           
+        
+        if specifyReadouts
+        % ------------------------------------------------------------------------
+        % Select readouts from readouts.fasta file
+        % Put in order as specified from codebook
+        %------------------------------------------------------------------------- 
+        
+        fprintf(logFID, '%s - Trimming readouts to specified list from codebook.\n', datestr(datetime), codebookPath);
+        
+        % Make ordered list of readouts given readouts.fasta, codebook
+        
+        readoutOrder = zeros(length(codebookHeader.bit_names), 1);
+        for k = 1:length(readoutOrder)
+           
+            readoutFound = find(~cellfun(@isempty, strfind(cellstr(vertcat(readouts.Header)), codebookHeader.bit_names{k})), 1);
+            
+            if isempty(readoutFound)
+               fprintf(logFID, '%s - Readout %s is in codebook but not in readouts.fasta file.\n', datestr(datetime), codebookHeader.bit_names{k});
+               error('Readout %s is in codebook but not in readouts.fasta file.', codebookHeader.bit_names{k}); 
+            else
+                readoutOrder(k) = readoutFound;
+            end
 
-        %% ------------------------------------------------------------------------
+        end
+        
+        % Trim readouts struct down to the ones we want to use, in order.
+        readouts = readouts(readoutOrder);
+        
+        fprintf(logFID, '%s - Retaining readouts .\n', datestr(datetime), codebookPath);
+        
+        else
+            fprintf(logFID, '%s - Using default readout ordering.\n', datestr(datetime), codebookPath);
+            
+            % Nothing else necessary to do here.  Ordering in
+            % readouts.fasta file will be used regardless of codebook
+            % bit_names specification. 
+        end
+        
+  
+        % ------------------------------------------------------------------------
         % Select isoforms
-        %%-------------------------------------------------------------------------
-        %% Identify the isoforms to keep from those requested in the codebook
+        %-------------------------------------------------------------------------
+        % Identify the isoforms to keep from those requested in the codebook
         finalIds = {codebook.id}; % Extract isoform ids from codebook
 
         % For codebooks that use a transcript spanning multiple IDs, there is a
