@@ -719,14 +719,15 @@ function MERFISHProbeDesign(varargin)
 
                     % Generate a OTTable for isoforms for the given gene
                     isoSpecificityTables(i) = OTTable(localTranscriptome, ...
-                        isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties                        'verbose', false, ...
+                        isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
+                        'verbose', false, ...                        
                         'transferAbund', false);
 
                 else
 
                     % Generate a OTTable for isoforms for the given gene
                     isoSpecificityTables(i) = OTTable(localTranscriptome, ...
-                       isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
+                        isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
                         'verbose', false, ...
                         'transferAbund', true);
 
@@ -915,6 +916,7 @@ function MERFISHProbeDesign(varargin)
 
             fprintf(logFID, '%s - Target regions loaded from %s\n', datestr(datetime), trRegionsPath);
         end
+
         %write the genename
         genenames={targetRegions.geneName}';
         geneids={targetRegions.id}';
@@ -967,6 +969,7 @@ function MERFISHProbeDesign(varargin)
 
         finalGenes = {codebook.name}; % Extract gene common names from codebook
         barcodes = char({codebook.barcode}) == '1'; % Extract string barcodes and convert to logical matrix
+
         %check if gene and ids match the reference
         genes_from_ids=targetRegions(ismember({targetRegions.id}, finalIds));
         genenames=targetRegions(ismember({targetRegions.geneName}, finalGenes));
@@ -1045,6 +1048,7 @@ function MERFISHProbeDesign(varargin)
         
         if keepGoingFlag
             oligos = [];
+
             allOligos = [];
             lastGene = '';
             
@@ -1187,6 +1191,7 @@ function MERFISHProbeDesign(varargin)
                                 display(['...     ' headers{indsToRemove(r)}]);
                             end
 
+
             %                 display(indsToKeep)
 
                             %indsToKeepForReal = [indsToKeepForReal, indsToKeep];
@@ -1264,10 +1269,11 @@ function MERFISHProbeDesign(varargin)
                             oligos(end+1).Header = headers{indsToKeepForReal(s)};
                             oligos(end).Sequence = seqs{indsToKeepForReal(s)};
                         end
-                            for s=1:length(indsToKeepForAll)
+                        for s=1:length(indsToKeepForAll)
                             allOligos(end+1).Header = headers{indsToKeepForAll(s)};
                             allOligos(end).Sequence = seqs{indsToKeepForAll(s)};
                         end
+
                         %if keepAllPossibleProbes
                             % Append all headers + seqs to cell
                          %   allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
