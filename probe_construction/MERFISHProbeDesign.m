@@ -681,13 +681,15 @@
 
             fprintf(logFID, '%s - Building transcriptome object.\n', datestr(datetime));
 
-            % Build transcriptome using existing abundance data
+            %Build transcriptome using existing abundance data
             transcriptome = Transcriptome(rawTranscriptomeFasta, ...
                 'abundPath', fpkmPath, ...
                 'verbose', true, ...
                 'headerType', transcriptomeHeaderType, ...
                 'IDType', transcriptomeIDType);
-
+            %transcriptome = Transcriptome(rawTranscriptomeFasta, ...
+             %   'abundPath', fpkmPath, ...
+              %  'verbose', true);
             transcriptome.Save(transcriptomePath);
             fprintf(logFID, '%s - Transcriptome object saved to %s\n', datestr(datetime), transcriptomePath);
         
@@ -739,7 +741,7 @@
                     % Generate a OTTable for isoforms for the given gene
                     isoSpecificityTables(i) = OTTable(localTranscriptome, ...
                         isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
-                        'verbose', false, ...
+                        'verbose', false, ...                        
                         'transferAbund', false);
 
                 else
@@ -819,7 +821,7 @@
         %% Create parallel pool... speeds up the construction of the TRDesigner and the construction of libraries
         if isempty(gcp('nocreate'))
             fprintf(logFID, '%s - Start parallel processing pool\n', datestr(datetime));
-            p = parpool(5);  % Insert a number here appropriate to the used computational resources
+            p = parpool(4);  % Insert a number here appropriate to the used computational resources
         else
             p = gcp;
         end
@@ -977,6 +979,11 @@
             fprintf(logFID, '%s - Target regions loaded from %s\n', datestr(datetime), trRegionsPath);
         end
 
+        %write the genename
+        genenames={targetRegions.geneName}';
+        geneids={targetRegions.id}';
+        numRegions={targetRegions.numRegions}';
+        writetable(table(genenames,geneids,numRegions),[analysisSavePath 'targetRegionsHuman.csv'],'WriteRowNames',false)
         %% ------------------------------------------------------------------------
         % Step 2: Compile the library 
         %  The target regions designed above will be compiled into template
@@ -1058,13 +1065,20 @@
         % string miss-match.  Replacing '_' with ',' in original codebook solves
         % this issue.
 
-        if ~strcmp(transcriptomeIDType, 'NCBI')
-            finalIds = strrep(finalIds, '_', ',');
-        end
+        %if ~strcmp(transcriptomeIDType, 'NCBI')
+         %   finalIds = strrep(finalIds, '_', ',');
+        %end
 
         finalGenes = {codebook.name}; % Extract gene common names from codebook
         barcodes = char({codebook.barcode}) == '1'; % Extract string barcodes and convert to logical matrix
 
+        %check if gene and ids match the reference
+        genes_from_ids=targetRegions(ismember({targetRegions.id}, finalIds));
+        genenames=targetRegions(ismember({targetRegions.geneName}, finalGenes));
+        if length(setdiff({genenames.geneName},{genes_from_ids.geneName}))>0
+        warning([char(setdiff({genenames.geneName},{genes_from_ids.geneName})),' ',char(setdiff({genes_from_ids.id},{genenames.id})),' is different from the reference']);
+        fprintf(logFID, ['WARNING! ', char(setdiff({genenames.geneName},{genes_from_ids.geneName})),' ',char(setdiff({genes_from_ids.id},{genenames.id})),' is different from the reference\n']);
+        end
 
         if versionMatch
             finalTargetRegions = targetRegions(ismember({targetRegions.id}, finalIds)); % Extract only the desired target regions
@@ -1137,13 +1151,14 @@
         if keepGoingFlag
             oligos = [];
 
+            allOligos = [];
             lastGene = '';
             
-            if keepAllPossibleProbes
-                allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
-                allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
-                seqCount = 1;
-            end
+            %if keepAllPossibleProbes
+             %   allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+              %  allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+               % seqCount = 1;
+            %end
 
             for i=1:length(finalIds)
                 % Save local gene
@@ -1290,12 +1305,13 @@
                                 display(['...     ' headers{indsToRemove(r)}]);
                             end
 
+
             %                 display(indsToKeep)
 
-                            indsToKeepForReal = [indsToKeepForReal, indsToKeep];
-
+                            %indsToKeepForReal = [indsToKeepForReal, indsToKeep];
+                            indsToKeepForReal =  indsToKeep;
                         end
-
+                           indsToKeepForAll = indsToKeepForReal(1:length(indsToKeepForReal));
                         indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
                         display(['... keeping ' num2str(length(indsToKeepForReal)) ' probes']);
                         fprintf(logFID, '%s - Retaining %d probes\n', datestr(datetime), length(indsToKeepForReal));
@@ -1367,13 +1383,17 @@
                             oligos(end+1).Header = headers{indsToKeepForReal(s)};
                             oligos(end).Sequence = seqs{indsToKeepForReal(s)};
                         end
-                        
-                        if keepAllPossibleProbes
-                            % Append all headers + seqs to cell
-                            allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
-                            allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
-                            seqCount = seqCount + length(seqs);
+                        for s=1:length(indsToKeepForAll)
+                            allOligos(end+1).Header = headers{indsToKeepForAll(s)};
+                            allOligos(end).Sequence = seqs{indsToKeepForAll(s)};
                         end
+
+                        %if keepAllPossibleProbes
+                            % Append all headers + seqs to cell
+                         %   allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
+                          %  allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
+                           % seqCount = seqCount + length(seqs);
+                        %end
 
 
                     else
@@ -1405,7 +1425,7 @@
                 allSeqs(cellfun(@isempty, allHeaders)) = [];
                 allHeaders(cellfun(@isempty, allHeaders)) = [];
                 
-                allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
+                %allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
                 
                 PageBreak();
                 fprintf(1, 'Writing: %s\n', allOligosPath);
