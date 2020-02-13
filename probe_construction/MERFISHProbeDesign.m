@@ -983,7 +983,7 @@
         genenames={targetRegions.geneName}';
         geneids={targetRegions.id}';
         numRegions={targetRegions.numRegions}';
-        writetable(table(genenames,geneids,numRegions),[analysisSavePath 'targetRegionsHuman.csv'],'WriteRowNames',false)
+        writetable(table(genenames,geneids,numRegions),[analysisSavePath 'targetRegions.csv'],'WriteRowNames',false)
         %% ------------------------------------------------------------------------
         % Step 2: Compile the library 
         %  The target regions designed above will be compiled into template
