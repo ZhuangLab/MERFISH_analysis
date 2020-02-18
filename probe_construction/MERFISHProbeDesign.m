@@ -1154,6 +1154,8 @@
             allOligos = [];
             lastGene = '';
             
+            Genes={};
+            ProbeNumbers={};  
             %if keepAllPossibleProbes
              %   allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
               %  allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
@@ -1215,6 +1217,7 @@
                                     localReadouts(2).Sequence = '';
                                     localReadouts(3).Header = '';
                                     localReadouts(3).Sequence = '';
+                                    longSide = 0;
 
                                 % 2-hot readout testing, smELT style
                                 elseif (sum(barcodes(i, :)) == 2) 
@@ -1222,7 +1225,7 @@
                                     localReadouts(2).Header = '';
                                     localReadouts(2).Sequence = ''; 
                                     localReadouts(3) = possibleReadouts(2);
-                                    
+                                    longSide = 0;
                                 else
                                     
                                     if readoutPermuteBySequence
@@ -1315,6 +1318,9 @@
                         indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
                         display(['... keeping ' num2str(length(indsToKeepForReal)) ' probes']);
                         fprintf(logFID, '%s - Retaining %d probes\n', datestr(datetime), length(indsToKeepForReal));
+                        %write the genename
+                        Genes=[Genes,localGeneName];
+                        ProbeNumbers=[ProbeNumbers,length(indsToKeepForReal)];       
 
                         % Check on number
                         if length(indsToKeepForReal) < numProbesPerGene
@@ -1415,15 +1421,19 @@
             fastawrite(possibleOligosPath, oligos);
             display(['... completed in ' num2str(toc(writeTimer))]);
             fprintf(logFID, '%s - Completed in %d s\n', datestr(datetime), toc(writeTimer));
-            
+            %%%%%Write out how many probes per gene as a table
+            Genes=Genes'
+            ProbeNumbers=ProbeNumbers'
+            writetable(table(Genes,ProbeNumbers),[analysisSavePath 'probesPerGeneMergedCode.csv'],'WriteRowNames',false)
+             
             if keepAllPossibleProbes
                 if obj.debugMode
                     assignin('base', 'allHeaders', allHeaders);
                     assignin('base', 'allSeqs', allSeqs);
                 end
                 
-                allSeqs(cellfun(@isempty, allHeaders)) = [];
-                allHeaders(cellfun(@isempty, allHeaders)) = [];
+                %allSeqs(cellfun(@isempty, allHeaders)) = [];
+                %allHeaders(cellfun(@isempty, allHeaders)) = [];
                 
                 %allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
                 
