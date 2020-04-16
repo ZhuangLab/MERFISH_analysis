@@ -68,6 +68,13 @@ classdef probeDesign < matlab.mixin.SetGet
         % in readout.fasta file)
         specifyReadouts {mustBeNumericOrLogical} = true;
         
+        % Parameters for filtering targetRegions object beyond parameter
+        % thresholds
+        geneIsoformListSource char {mustBeMember(geneIsoformListSource,{'codebook','allGenes', 'default'})} = 'default';
+        tRFilterMethod char {mustBeMember(tRFilterMethod,{'parameter','relaxIsospecificity', 'default', 'commonRegions'})} = 'default';
+        tRFilterField char {mustBeMember(tRFilterField,{'regionLength','GC', 'Tm', 'specificity', 'isoSpecificity', ''})} = '';
+        tRFilterParameters = [0, 1];
+        
         %---------------------------------------------------------------
         % Generated paths that could be reused if existing, things match
         % 
@@ -192,7 +199,10 @@ classdef probeDesign < matlab.mixin.SetGet
                           'specificityTablePath', ...
                           'isoSpecificityTablePath', ...
                           'trDesignerPath', ...
-						  'species'}
+						  'species', ...
+                          'geneIsoformListSource', ...
+                          'tRFilterMethod', ...
+                          'tRFilterField'}
                         
                         if all(isstrprop(ret{2}, 'digit') | (ret{2} == '.') | (ret{2} == 'e') | (ret{2} == '-'))
                             obj.(ret{1}) = str2double(ret{2});
@@ -200,7 +210,7 @@ classdef probeDesign < matlab.mixin.SetGet
                             obj.(ret{1}) = ret{2};
                         end
 
-                    case {'GC', 'Tm', 'isoSpecificity', 'specificity'}
+                    case {'GC', 'Tm', 'isoSpecificity', 'specificity', 'tRFilterParameters'}
                         
                         % To do - convert from strings to pairs of doubles
                         
@@ -223,6 +233,8 @@ classdef probeDesign < matlab.mixin.SetGet
                                 obj.isoSpecificity = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             elseif strcmp(ret{1}, 'specificity')
                                 obj.specificity = str2double(strsplit(ret{2}(2:(end-1)), ','));
+                            elseif strcmp(ret{1}, 'tRFilterParameters')
+                                obj.tRFilterParameters = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             else
                                 error('Bad value at primerBlockFound as false in switch-case');
                             end
@@ -302,7 +314,8 @@ classdef probeDesign < matlab.mixin.SetGet
                          'transcriptomePath', ...
                          'specificityTablePath', ...
                          'isoSpecificityTablePath', ...
-                         'trDesignerPath'}
+                         'trDesignerPath', ...
+                         'tRFilterField'}
                      % These properties can be empty at start.
                      
                      validProp(iprop) = 0;

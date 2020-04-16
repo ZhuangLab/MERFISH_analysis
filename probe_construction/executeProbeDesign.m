@@ -60,9 +60,26 @@
  %   display('Error on Human_MTG_barcoded_202000121');
 %end
 % 
+% pd = probeDesign();
+% pd.matchLogFile('D:\Data\MERFISH\Musmusculus\Mouse_VISp_Barcodealt_from010120log\Mouse_VISp_Barcodealt_from010120log.log');
+% set(pd, 'libraryName', 'MouseVISp_memErrorTesting_v2', 'specifyReadouts', true, 'keepAllPossibleProbes', true, 'debugMode', true);
+% pd.buildLibrary()
+
+bf = 'C:\Users\ScanningLabAnalysis\Documents\MATLAB\MERFISHProbeDesign\targetRegionsCalcs';
+cdbkName = 'fakeMTGcodebook.csv';
 pd = probeDesign();
-pd.matchLogFile('D:\Data\MERFISH\Musmusculus\Mouse_VISp_Barcodealt_from010120log\Mouse_VISp_Barcodealt_from010120log.log');
-set(pd, 'libraryName', 'MouseVISp_memErrorTesting_v2', 'specifyReadouts', true, 'keepAllPossibleProbes', true, 'debugMode', true);
+pd.matchLogFile('D:\Data\MERFISH\Homosapiens\Human_MTG_barcoded_20200114\Human_MTG_barcoded_20200114.log');
+set(pd, 'rawTranscriptomeFasta', 'D:\Data\MERFISH\Homosapiens\LIMSReferenceFiles\human.transcript.genesymbol.fa');
+set(pd, 'ncRNAPath', 'D:\Data\MERFISH\Homosapiens\LIMSReferenceFiles\human.transcript.genesymbol.nc.fa');
+set(pd, 'codebookPath', fullfile(bf, 'fakeMTGcodebook.csv'));
+set(pd, 'fpkmPath', fullfile(bf, 'MTG.cleaned.isoforms.fpkm_tracking'));
+set(pd, 'libraryName', 'HumanMTG_TargetRegionsTester', ...
+        'specifyReadouts', true, ...
+        'keepAllPossibleProbes', true, ...
+        'debugMode', true, ...
+        'useUniformWeights', false, ...
+        'FPKMabundanceThreshold', 0.01, ...
+        'transcriptomeHeaderType', 'cufflinks');
 pd.buildLibrary()
 
 

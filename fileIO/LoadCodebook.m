@@ -138,6 +138,8 @@ switch header.version
                 stringParts = strsplit(line, ',', 'CollapseDelimiters', false);
                 stringParts = cellfun(@strtrim, stringParts, 'UniformOutput', false);
 
+                assignin('base', 'stringParts', stringParts);
+                assignin('base', 'line', line);
                 codebook(end+1).name = stringParts{1};
                 codebook(end).id = stringParts{2};
                 codebook(end).barcode = parameters.barcodeConvFunc(rmspace(stringParts{3}));

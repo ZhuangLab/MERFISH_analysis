@@ -134,6 +134,11 @@
         primerDesignParameters.primerConcentration = 0.5e-6;
         
 
+        targetRegionsFilter.geneIsoformListSource = 'allGenes';
+        targetRegionsFilter.tRFilterMethod = 'default';
+        targetRegionsFilter.tRFilterField = '';
+        targetRegionsFilter.tRFilterParameters = [0, 1];
+        
         % Indicate if this is allowed to ignore sequence version number in matching
         versionMatch = false;
         
@@ -232,6 +237,12 @@
         primerDesignParameters.primerMonovalentSaltConcentration = obj.primerMonovalentSaltConcentration;
         primerDesignParameters.primerConcentration = obj.primerConcentration;
 
+        targetRegionsFilter.geneIsoformListSource = obj.geneIsoformListSource;
+        targetRegionsFilter.tRFilterMethod = obj.tRFilterMethod;
+        targetRegionsFilter.tRFilterField = obj.tRFilterField;
+        targetRegionsFilter.tRFilterParameters = obj.tRFilterParameters;
+
+        
         % Indicate if this is allowed to ignore sequence version number in matching
         versionMatch = obj.versionMatch;
         
@@ -590,6 +601,12 @@
         fprintf(logFID, 'keepAllPossibleProbes : %d\n', keepAllPossibleProbes);
         fprintf(logFID, 'specifyReadouts : %d\n', specifyReadouts);
         fprintf(logFID, 'readoutPermuteBySequence : %d\n', readoutPermuteBySequence);
+        fprintf(logFID, 'geneIsoformListSource : %s\n', geneIsoformListSource);
+        fprintf(logFID, 'tRFilterMethod : %s\n', tRFilterMethod);
+        fprintf(logFID, 'tRFilterField : %s\n', tRFilterField);
+        fprintf(logFID, 'tRFilterParameters : [%d, %d]\n', tRFilterParameters);
+        
+        
         fprintf(logFID, '-----------------------------\n');
 
 
@@ -990,6 +1007,92 @@
         %  molecules that can be used to build the desired probe library
         %%-------------------------------------------------------------------------
 
+        
+        %% ------------------------------------------------------------------------
+        % Filter targetRegions 
+        %%-------------------------------------------------------------------------
+        % If steps above were not sufficiently restrictive for
+        % targetRegions design
+        % -- OR -- 
+        % you want to implement a new way of filtering targetRegions, do so here.
+        
+
+        % Can filter to only those genes in the codebook, 
+        % or to top abundance isoform of all genes
+        switch targetRegionsFilter.geneIsoformListSource
+
+            case 'codebook'
+
+                % Pull target isoforms for each gene
+                [geneIsoformList, ~] = LoadCodebook(codebookPath, 'verbose', true);
+
+
+            case 'allGenes'
+                % Do a filtering for ALL TargetRegions in the slicedTranscriptome
+                allGeneNames = slicedTranscriptome.GetNames();
+                geneIsoformList(length(allGeneNames)) = struct('name', '', ...
+                                                               'id', '');
+                for k = 1:length(allGeneNames)
+                    idsHere = slicedTranscriptome.GetIDsByName(allGeneNames{k});
+                    abundsHere = slicedTranscriptome.GetAbundanceByID(idsHere{1});
+                    topAbundanceIsoform = idsHere{1}{abundsHere == max(abundsHere)};
+
+                    geneIsoformList(k).name = allGeneNames{k};
+                    % Include only most abundant isoform
+                    geneIsoformList(k).id = topAbundanceIsoform;
+                end
+                
+            case 'default'
+                % No filtering to do, so this can be default
+
+            otherwise
+                error('geneListDefinedBy must be "codebook" or "allGenes"\n');
+        end
+        
+        
+        switch targetRegionsFilter.tRFilterMethod
+            case ('default')
+                % Do nothing.  Trust upstream filtering approach
+                
+            case ('parameter')
+                % Filter by defined parameter
+                
+                targetRegions = findFilteredTargetRegions(targetRegions, ...
+                                                          geneIsoformList, ...
+                                                          numProbesPerGene, ...
+                                                          logFID, ...
+                                                          targetRegionsFilter.tRFilterField, ...
+                                                          targetRegionsFilter.tRFilterParameters);
+                                                      
+            case ('relaxIsospecificity')
+                % Return regions of genes that have min isospecificity to
+                % yield at least minNumberOfProbes on each target isoform
+                
+                targetRegions = findExpandedIsospecificityTargetRegions(targetRegions, ...
+                                        geneIsoformList, ...
+                                        numProbesPerGene, ... 
+                                        logFID);
+                
+            case ('commonRegions')
+                % Return regions of genes that are common across isoforms
+                % and each isoform carries 0 or at least minNumberOfProbes
+                % targetRegions.
+                
+                targetRegions = findCommonTargetRegions(targetRegions, ...
+                                                        geneIsoformList, ...
+                                                        numProbesPerGene, ... 
+                                                        logFID);
+                
+                
+            otherwise
+                error('obj.targetRegionsFilter.method incorrectly specified');
+        end
+        
+        
+        
+
+        
+        
         %% ------------------------------------------------------------------------
         % Load readouts, target regions, codewords, and selected genes
         %%-------------------------------------------------------------------------
@@ -1114,6 +1217,9 @@
 
 
         end
+        
+
+        
 
         %% ------------------------------------------------------------------------
         % Construct the library

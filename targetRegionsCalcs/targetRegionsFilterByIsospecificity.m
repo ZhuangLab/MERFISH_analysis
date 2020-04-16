@@ -72,7 +72,7 @@
 % steps in workflow. True hack is to work on CSV output table as in here.
 
 
-baseFolder = 'C:\Users\Rusty Nicovich\Documents\MATLAB\targetRegionsCalcs';
+baseFolder = 'C:\Users\ScanningLabAnalysis\Documents\MATLAB\MERFISHProbeDesign\targetRegionsCalcs';
 
 targetRegionsFile = 'target_regions_CUX2_LHX6_GAD1_iso_0_1.csv';
 fpkmFile = 'MTG.cleaned.isoforms.fpkm_tracking';
