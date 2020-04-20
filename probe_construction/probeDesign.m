@@ -62,6 +62,10 @@ classdef probeDesign < matlab.mixin.SetGet
         
         readoutPermuteBySequence {mustBeNumericOrLogical} = true;
         
+        % True - equally space valid probes along target sequence
+        % False - randomly sprinkle probes along target sequence
+        spaceOutProbes {mustBeNumericOrLogical} = false;
+        
         % Use readouts explicitly specified in codebook file header as
         % bit_names
         % If false, use default readout ordering (first N sequences/names
@@ -72,8 +76,8 @@ classdef probeDesign < matlab.mixin.SetGet
         % thresholds
         geneIsoformListSource char {mustBeMember(geneIsoformListSource,{'codebook','allGenes', 'default'})} = 'default';
         tRFilterMethod char {mustBeMember(tRFilterMethod,{'parameter','relaxIsospecificity', 'default', 'commonRegions'})} = 'default';
-        tRFilterField char {mustBeMember(tRFilterField,{'regionLength','GC', 'Tm', 'specificity', 'isoSpecificity', ''})} = '';
-        tRFilterParameters = [0, 1];
+        tRFilterField char {mustBeMember(tRFilterField,{'regionLength','GC', 'Tm', 'specificity', 'isoSpecificity', 'none'})} = 'none';
+        tRFilterParameters = [0, -1];
         
         %---------------------------------------------------------------
         % Generated paths that could be reused if existing, things match
@@ -217,10 +221,13 @@ classdef probeDesign < matlab.mixin.SetGet
                         
                         % could be readout or primer
                         if primerBlockFound
+
                             if strcmp(ret{1}, 'GC')
                                 obj.cutPrimersGC = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             elseif strcmp(ret{1}, 'Tm')
                                 obj.cutPrimersTm = str2double(strsplit(ret{2}(2:(end-1)), ','));
+                            elseif strcmp(ret{1}, 'tRFilterParameters')
+                                obj.tRFilterParameters = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             else
                                 error('Bad value at primerBlockFound as true in switch-case');
                             end
@@ -233,8 +240,6 @@ classdef probeDesign < matlab.mixin.SetGet
                                 obj.isoSpecificity = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             elseif strcmp(ret{1}, 'specificity')
                                 obj.specificity = str2double(strsplit(ret{2}(2:(end-1)), ','));
-                            elseif strcmp(ret{1}, 'tRFilterParameters')
-                                obj.tRFilterParameters = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             else
                                 error('Bad value at primerBlockFound as false in switch-case');
                             end
@@ -256,16 +261,19 @@ classdef probeDesign < matlab.mixin.SetGet
 
                     case 'doubleHeadedsmELT'
                         % assignin('base', 'line2', ret)
-                        obj.doubleHeadedsmELT = (ret{2} == '0');
+                        obj.doubleHeadedsmELT = (ret{2} == '1'); % should final term be '0' or '1'?
                         
                     case 'keepAllPossibleProbes'
-                        obj.keepAllPossibleProbes = (ret{2} == '0');
+                        obj.keepAllPossibleProbes = (ret{2} == '1');
                     
                     case 'specifyReadouts'
-                        obj.specifyReadouts = (ret{2} == '0');
+                        obj.specifyReadouts = (ret{2} == '1');
                         
                     case 'readoutPermuteBySequence'
-                        obj.readoutPermuteBySequence = (ret{2} == '0');
+                        obj.readoutPermuteBySequence = (ret{2} == '1');
+                        
+                    case 'spaceOutProbes'
+                        obj.spaceOutProbes = (ret{2} == '1');
                         
                 end
             end

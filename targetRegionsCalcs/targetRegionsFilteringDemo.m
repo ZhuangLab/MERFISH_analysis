@@ -47,26 +47,28 @@ switch geneListDefinedBy
         error('geneListDefinedBy must be "codebook" or "allGenes"\n');
 end
 
+%%
 
+for minNumberOfProbes = [40, 65]
 
-%% Return regions within given parameter range
+% Return regions within given parameter range
 filterField = 'isoSpecificity';
 parameterRange = [0.75, 1.0];
 
 filteredTargetRegions = findFilteredTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget, filterField, parameterRange);
-outputTargetRegionsTable(fullfile(baseFolder, 'isospecThresholdedTargetRegions.csv'), ...
+outputTargetRegionsTable(fullfile(baseFolder, sprintf('isospecThresholdedTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
     filteredTargetRegions, sprintf('isospecificityThreshold=[%.2f, %.2f]', min(parameterRange), max(parameterRange)), minNumberOfProbes);
 
-%% Return common regions 
+% Return common regions 
 commonTargetRegions = findCommonTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget);
-outputTargetRegionsTable(fullfile(baseFolder, 'commonTargetRegions.csv'), ...
+outputTargetRegionsTable(fullfile(baseFolder, sprintf('commonTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
     commonTargetRegions, 'commonRegions', minNumberOfProbes);
 
-%% Return regions by relaxing isospecificity
+% Return regions by relaxing isospecificity
 expandedTargetRegions = findExpandedIsospecificityTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget);
-outputTargetRegionsTable(fullfile(baseFolder, 'relaxIsospecTargetRegions.csv'), ...
+outputTargetRegionsTable(fullfile(baseFolder, sprintf('relaxIsospecTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
     expandedTargetRegions, 'relaxIsospec', minNumberOfProbes);
-
+end
 
 
 

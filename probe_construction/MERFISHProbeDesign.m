@@ -122,6 +122,7 @@
         regionDesignParameters.probeSpacing = 3; % nt of gap between probes - set to negative to allow overlap
 
         numProbesPerGene = 48;
+        spaceOutProbes = false;
 
 
         primerDesignParameters.nPrimersToGenerate = 1e3;
@@ -253,6 +254,8 @@
         specifyReadouts = obj.specifyReadouts;
         
         debugMode = obj.debugMode;
+        
+        spaceOutProbes = obj.spaceOutProbes;
         
         readoutPermuteBySequence = obj.readoutPermuteBySequence;
         
@@ -587,6 +590,7 @@
         fprintf(logFID, 'probeSpacing : %d\n', regionDesignParameters.probeSpacing);
         fprintf(logFID, '\n');
         fprintf(logFID, 'numProbesPerGene : %d\n', numProbesPerGene);
+        fprintf(logFID, 'spaceOutProbes : %d\n', spaceOutProbes);
         fprintf(logFID, '\n');
         fprintf(logFID, 'primerDesignParameters\n');
         fprintf(logFID, 'nPrimersToGenerate : %d\n', primerDesignParameters.nPrimersToGenerate);
@@ -601,10 +605,12 @@
         fprintf(logFID, 'keepAllPossibleProbes : %d\n', keepAllPossibleProbes);
         fprintf(logFID, 'specifyReadouts : %d\n', specifyReadouts);
         fprintf(logFID, 'readoutPermuteBySequence : %d\n', readoutPermuteBySequence);
-        fprintf(logFID, 'geneIsoformListSource : %s\n', geneIsoformListSource);
-        fprintf(logFID, 'tRFilterMethod : %s\n', tRFilterMethod);
-        fprintf(logFID, 'tRFilterField : %s\n', tRFilterField);
-        fprintf(logFID, 'tRFilterParameters : [%d, %d]\n', tRFilterParameters);
+        fprintf(logFID, '\n');
+        fprintf(logFID, 'targetRegionsFilter\n');
+        fprintf(logFID, 'geneIsoformListSource : %s\n', targetRegionsFilter.geneIsoformListSource);
+        fprintf(logFID, 'tRFilterMethod : %s\n', targetRegionsFilter.tRFilterMethod);
+        fprintf(logFID, 'tRFilterField : %s\n', targetRegionsFilter.tRFilterField);
+        fprintf(logFID, 'tRFilterParameters : [%d, %d]\n', targetRegionsFilter.tRFilterParameters);
         
         
         fprintf(logFID, '-----------------------------\n');
@@ -930,7 +936,7 @@
         % Can clear large objects from memory at this point
         clear specificityTable
         clear isoSpecificityTable
-        clear slicedTranscriptome
+     %   clear slicedTranscriptome
 %         clear OTrRNA15   - used to calc penalties for ncRNA later! 
         drawnow;
         
@@ -1016,10 +1022,17 @@
         % -- OR -- 
         % you want to implement a new way of filtering targetRegions, do so here.
         
+        fprintf(1, '%s - Filtering target regions\n', datestr(datetime));
+        fprintf(logFID, '%s - Filtering target regions\n', datestr(datetime));
 
+        fprintf(1, '%s - Populating geneIsoformList from %s\n', datestr(datetime), targetRegionsFilter.geneIsoformListSource);
+        fprintf(logFID, '%s - Populating geneIsoformList from %s\n', datestr(datetime), targetRegionsFilter.geneIsoformListSource);
+        
         % Can filter to only those genes in the codebook, 
         % or to top abundance isoform of all genes
         switch targetRegionsFilter.geneIsoformListSource
+            
+
 
             case 'codebook'
 
@@ -1048,6 +1061,10 @@
             otherwise
                 error('geneListDefinedBy must be "codebook" or "allGenes"\n');
         end
+        
+        
+        fprintf(1, '%s - Filtering targetRegions by method %s\n', datestr(datetime), targetRegionsFilter.tRFilterMethod);
+        fprintf(logFID, '%s - Filtering targetRegions by method %s\n', datestr(datetime), targetRegionsFilter.tRFilterMethod);
         
         
         switch targetRegionsFilter.tRFilterMethod
@@ -1088,10 +1105,10 @@
                 error('obj.targetRegionsFilter.method incorrectly specified');
         end
         
-        
+       fprintf(1, '%s - TargetRegions filtering complete!\n', datestr(datetime)); 
+       fprintf(logFID, '%s - TargetRegions filtering complete!\n', datestr(datetime));
         
 
-        
         
         %% ------------------------------------------------------------------------
         % Load readouts, target regions, codewords, and selected genes
@@ -1421,7 +1438,24 @@
                             indsToKeepForReal =  indsToKeep;
                         end
                            indsToKeepForAll = indsToKeepForReal(1:length(indsToKeepForReal));
-                        indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
+                           
+                        
+                        % To implement   
+                        % If oligos to this point > numProbesPerGene, 
+                        % Select which oligos will survive
+                        % Default is random selection
+                        % 'spread' is use linspace, get probes equally
+                        % spaced along molecule.
+                           
+                        
+                        if spaceOutProbes   
+                            indsToKeepForReal = indsToKeepForReal(round(linspace(1, length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene]))));
+                        else
+                            indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
+                        end
+                        
+
+                        
                         display(['... keeping ' num2str(length(indsToKeepForReal)) ' probes']);
                         fprintf(logFID, '%s - Retaining %d probes\n', datestr(datetime), length(indsToKeepForReal));
                         %write the genename
@@ -1528,14 +1562,13 @@
             display(['... completed in ' num2str(toc(writeTimer))]);
             fprintf(logFID, '%s - Completed in %d s\n', datestr(datetime), toc(writeTimer));
             %%%%%Write out how many probes per gene as a table
-            Genes=Genes'
-            ProbeNumbers=ProbeNumbers'
-            writetable(table(Genes,ProbeNumbers),[analysisSavePath 'probesPerGeneMergedCode.csv'],'WriteRowNames',false)
+            Genes=Genes';
+            ProbeNumbers=ProbeNumbers';
+            writetable(table(Genes,ProbeNumbers),[analysisSavePath 'probesPerGeneMergedCode.csv'],'WriteRowNames',false);
              
             if keepAllPossibleProbes
                 if obj.debugMode
-                    assignin('base', 'allHeaders', allHeaders);
-                    assignin('base', 'allSeqs', allSeqs);
+                    assignin('base', 'allOligos', allOligos);
                 end
                 
                 %allSeqs(cellfun(@isempty, allHeaders)) = [];
