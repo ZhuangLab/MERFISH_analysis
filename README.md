@@ -131,12 +131,13 @@ Required variables:
 					 readoutPermuteBySequence: Boolean.  If true, use modulo of sequence to assign readouts to probe.  If false, use randperm().
 							   spaceOutProbes: Boolean.  If true, and probes > numProbesPerGene, select probes which are most spaced out.  If false, select randomly. 
 							  specifyReadouts: Boolean.  If true, use readout names specified in header of codebook file.  If false, use order from readouts.fasta file.
-                                 rRNAtRNAPath: String.  File path to previously-generated rRNAtRNAPath file.  Will be loaded if inputs in object match those of saved.
-								                         geneIsoformListSource: 'default'
-                               tRFilterMethod: 'default'
-                                tRFilterField: 'none'
-                           tRFilterParameters: [0 -1]
-								 
+						geneIsoformListSource: String. Source of gene + isoform pairs to filter in targetRegions filters. 'default', 'allGenes', or 'codebook'.
+                               tRFilterMethod: String. Method for filtering targetRegions. 'default', 'parameter','relaxIsospecificity', or 'commonRegions'.
+                                tRFilterField: String. If tRFilterMethod = 'parameter', which parameter field to filter over. 'regionLength','GC', 'Tm', 
+												'specificity', 'isoSpecificity', 'none'
+                           tRFilterParameters: [Double Double]. If tRFilterMethod = 'parameter', range for filtering targetRegions. 
+								rRNAtRNAPath: String.  File path to previously-generated rRNAtRNAPath file.  Will be loaded if inputs in object match those of
+													saved.             	 
                             transcriptomePath: String.  File path to previously-generated transcriptome object file.  Will be loaded if inputs in object match those of saved.
                          specificityTablePath: String.  File path to previously-generated specificity table object file.  Will be loaded if inputs in object match those of saved.
                       isoSpecificityTablePath: String.  File path to previously-generated isoSpecificity table object file.  Will be loaded if inputs in object match those of saved.
