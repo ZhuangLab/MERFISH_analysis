@@ -3,6 +3,8 @@ trPath = 'D:\Data\MERFISH\Homosapiens\HumanMTG_TargetRegionsTester\tr_GC_43_63_T
 minNumberOfProbes = 67;
 printTarget = 1;
 
+saveToFile = true;
+
 geneListDefinedBy = 'allGenes'; % 'codebook' or 'allGenes'
 
 %%
@@ -51,23 +53,30 @@ end
 
 for minNumberOfProbes = [40, 65]
 
-% Return regions within given parameter range
-filterField = 'isoSpecificity';
-parameterRange = [0.75, 1.0];
+    % Return regions within given parameter range
+    filterField = 'isoSpecificity';
+    parameterRange = [0.75, 1.0];
 
-filteredTargetRegions = findFilteredTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget, filterField, parameterRange);
-outputTargetRegionsTable(fullfile(baseFolder, sprintf('isospecThresholdedTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
-    filteredTargetRegions, sprintf('isospecificityThreshold=[%.2f, %.2f]', min(parameterRange), max(parameterRange)), minNumberOfProbes);
+    filteredTargetRegions = findFilteredTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget, filterField, parameterRange);
 
-% Return common regions 
-commonTargetRegions = findCommonTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget);
-outputTargetRegionsTable(fullfile(baseFolder, sprintf('commonTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
-    commonTargetRegions, 'commonRegions', minNumberOfProbes);
+    % Return common regions 
+    commonTargetRegions = findCommonTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget);
 
-% Return regions by relaxing isospecificity
-expandedTargetRegions = findExpandedIsospecificityTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget);
-outputTargetRegionsTable(fullfile(baseFolder, sprintf('relaxIsospecTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
-    expandedTargetRegions, 'relaxIsospec', minNumberOfProbes);
+    % Return regions by relaxing isospecificity
+    expandedTargetRegions = findExpandedIsospecificityTargetRegions(tR, geneIsoformList, minNumberOfProbes, printTarget);
+
+
+    if saveTofile
+        outputTargetRegionsTable(fullfile(baseFolder, sprintf('isospecThresholdedTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
+            filteredTargetRegions, sprintf('isospecificityThreshold=[%.2f, %.2f]', min(parameterRange), max(parameterRange)), minNumberOfProbes);
+
+        outputTargetRegionsTable(fullfile(baseFolder, sprintf('commonTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
+            commonTargetRegions, 'commonRegions', minNumberOfProbes);
+
+        outputTargetRegionsTable(fullfile(baseFolder, sprintf('relaxIsospecTargetRegions_minProbes-%d.csv', minNumberOfProbes)), ...
+            expandedTargetRegions, 'relaxIsospec', minNumberOfProbes);
+    end
+
 end
 
 

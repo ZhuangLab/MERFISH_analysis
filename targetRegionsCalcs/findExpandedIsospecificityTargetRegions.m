@@ -54,8 +54,8 @@ function filteredTargetRegions = findExpandedIsospecificityTargetRegions(tR, gen
         isospecCounts = histc(tR(rowsHere).isoSpecificity, (isospecsHere));
 
         % Find threshold isospecificity to cross minNumberOfProbes value
-        isospecsDescend = flipud(isospecsHere);
-        cumCounts = cumsum(flipud(isospecCounts));
+        isospecsDescend = fliplr(isospecsHere);
+        cumCounts = cumsum(fliplr(isospecCounts));
         whichValHasEnoughCounts = find(cumCounts >= minNumberOfProbes, 1, 'first');
         maxIsospecWithEnoughProbes = isospecsDescend(whichValHasEnoughCounts);
 
