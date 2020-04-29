@@ -39,8 +39,7 @@ classdef probeDesign < matlab.mixin.SetGet
         probeConcentration {mustBeNumeric, mustBeNonnegative} = 5e-9; % mol/L
         probeSpacing {mustBeNumeric} = 3; % nt of gap between probes - set to negative to allow overlap
 
-        numProbesPerGene {mustBeNumeric, mustBeNonnegative} = 48;
-
+        numProbesPerGene = [48, 92];
 
         nPrimersToGenerate {mustBeNumeric, mustBeNonnegative} = 1e3;
         primerLength {mustBeNumeric, mustBeNonnegative} = 20;
@@ -195,7 +194,6 @@ classdef probeDesign < matlab.mixin.SetGet
                           'monovalentSaltConcentration', ...
                           'probeConcentration', ...
                           'probeSpacing',...
-                          'numProbesPerGene', ...
                           'nPrimersToGenerate', ...
                           'primerLength', ...
                           'rRNAtRNAPath', ...
@@ -214,6 +212,16 @@ classdef probeDesign < matlab.mixin.SetGet
                             obj.(ret{1}) = ret{2};
                         end
 
+                    case {'numProbesPerGene'}
+                        % Could be single value or pair of doubles
+                        if all(isstrprop(ret{2}, 'digit'))
+                            % Single integer
+                            obj.numProbesPerGene = str2double(ret{2});
+                        else
+                            % Pair of integers
+                            obj.numProbesPerGene = str2double(strsplit(ret{2}(2:(end-1)), ','));
+                        end
+                    
                     case {'GC', 'Tm', 'isoSpecificity', 'specificity', 'tRFilterParameters'}
                         
                         % To do - convert from strings to pairs of doubles

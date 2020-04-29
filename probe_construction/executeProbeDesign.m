@@ -86,8 +86,18 @@ set(pd, 'libraryName', 'HumanMTG_TargetRegionsTester_intTest', ...
 pd.buildLibrary()
 
 %%
+bf = 'D:\Data\MERFISH\Homosapiens';
 pd = probeDesign();
-pd.matchLogFile('D:\Data\MERFISH\Homosapiens\HumanMTG_TargetRegionsTester_intTest\HumanMTG_TargetRegionsTester_intTest.log');
+pd.matchLogFile('D:\Data\MERFISH\Homosapiens\HumanMTG_TargetRegionsTester_correctTRsRtrn\firstRunWithSinglenumProbesValue\HumanMTG_TargetRegionsTester_correctTRsRtrn.log');
+set(pd, 'codebookPath', fullfile(bf, 'MTG_26_MARCH5Correction.csv'));
+set(pd, 'libraryName', 'HumanMTG_TargetRegionsTester_correctTRsRtrn');
+set(pd, 'geneIsoformListSource', 'codebook',...
+        'tRFilterMethod', 'parameter', ...
+        'tRFilterField', 'isoSpecificity', ...
+        'tRFilterParameters', [0.75, 1], ...
+        'spaceOutProbes', true, ...
+        'numProbesPerGene', [48, 92]);
+pd.buildLibrary()
 
 
 

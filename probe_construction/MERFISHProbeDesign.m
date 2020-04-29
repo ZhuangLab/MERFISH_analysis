@@ -121,7 +121,7 @@
         regionDesignParameters.probeConcentration = 5e-9; % mol/L
         regionDesignParameters.probeSpacing = 3; % nt of gap between probes - set to negative to allow overlap
 
-        numProbesPerGene = 48;
+        numProbesPerGene = [48, 92];  % Min-max values OK or single value. Min used in filtering, error messages. Will truncate to max.
         spaceOutProbes = false;
 
 
@@ -589,7 +589,14 @@
         fprintf(logFID, 'probeConcentration : %d\n', regionDesignParameters.probeConcentration);
         fprintf(logFID, 'probeSpacing : %d\n', regionDesignParameters.probeSpacing);
         fprintf(logFID, '\n');
-        fprintf(logFID, 'numProbesPerGene : %d\n', numProbesPerGene);
+        if numel(numProbesPerGene) == 1
+            fprintf(logFID, 'numProbesPerGene : %d\n', numProbesPerGene);
+        elseif numel(numProbesPerGene) == 2
+            fprintf(logFID, 'numProbesPerGene : [%d, %d]\n', numProbesPerGene(1), numProbesPerGene(2));
+        else
+            fclose(logFID);
+            error('Variable numProbesPerGene must be a single integer or 1 x 2 vector!');
+        end
         fprintf(logFID, 'spaceOutProbes : %d\n', spaceOutProbes);
         fprintf(logFID, '\n');
         fprintf(logFID, 'primerDesignParameters\n');
@@ -1076,7 +1083,7 @@
                 
                 targetRegions = findFilteredTargetRegions(targetRegions, ...
                                                           geneIsoformList, ...
-                                                          numProbesPerGene, ...
+                                                          min(numProbesPerGene(:)), ...
                                                           logFID, ...
                                                           targetRegionsFilter.tRFilterField, ...
                                                           targetRegionsFilter.tRFilterParameters);
@@ -1087,7 +1094,7 @@
                 
                 targetRegions = findExpandedIsospecificityTargetRegions(targetRegions, ...
                                         geneIsoformList, ...
-                                        numProbesPerGene, ... 
+                                        min(numProbesPerGene(:)), ... 
                                         logFID);
                 
             case ('commonRegions')
@@ -1097,7 +1104,7 @@
                 
                 targetRegions = findCommonTargetRegions(targetRegions, ...
                                                         geneIsoformList, ...
-                                                        numProbesPerGene, ... 
+                                                        min(numProbesPerGene(:)), ... 
                                                         logFID);
                 
                 
@@ -1246,8 +1253,8 @@
         PageBreak();
         display(['Designing oligos for ' libraryName]);
         fprintf(logFID, '%s - Desgining oligos for %s\n', datestr(datetime), libraryName);
-        display(['... ' num2str(numProbesPerGene) ' probes per gene']);
-        fprintf(logFID, '%s - Using %d probes per gene\n', datestr(datetime), numProbesPerGene);
+        display(['... ' num2str(max(numProbesPerGene(:))) ' probes per gene']);
+        fprintf(logFID, '%s - Using %d probes per gene\n', datestr(datetime), max(numProbesPerGene(:)));
 
         %% Record the used readout sequences
         
@@ -1441,7 +1448,7 @@
                            
                         
                         % To implement   
-                        % If oligos to this point > numProbesPerGene, 
+                        % If oligos to this point > max(numProbesPerGene(:)), 
                         % Select which oligos will survive
                         % Default is random selection
                         % 'spread' is use linspace, get probes equally
@@ -1449,9 +1456,9 @@
                            
                         
                         if spaceOutProbes   
-                            indsToKeepForReal = indsToKeepForReal(round(linspace(1, length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene]))));
+                            indsToKeepForReal = indsToKeepForReal(round(linspace(1, length(indsToKeepForReal), min([length(indsToKeepForReal) max(numProbesPerGene(:))]))));
                         else
-                            indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
+                            indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) max(numProbesPerGene(:))])));
                         end
                         
 
@@ -1463,7 +1470,7 @@
                         ProbeNumbers=[ProbeNumbers,length(indsToKeepForReal)];       
 
                         % Check on number
-                        if length(indsToKeepForReal) < numProbesPerGene
+                        if length(indsToKeepForReal) < min(numProbesPerGene(:))
                             warning(' ');
                             display(['Not enough probes for ' num2str(i) ': ' tRegion.geneName]);
                             fprintf(logFID, '%s - Not enough probes for %s!\n', datestr(datetime), tRegion.geneName);
