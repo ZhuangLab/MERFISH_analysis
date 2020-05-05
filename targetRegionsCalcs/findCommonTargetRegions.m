@@ -62,7 +62,7 @@ for t = 1:length(geneIsoformList)
     maxLength = max(numRegs);
     fprintf(printTarget, 'Longest isoform of %d has %d target regions\n', length(numRegs), maxLength);
     
-    if maxLength <= minNumberOfProbes
+    if maxLength < minNumberOfProbes
         % All isoforms of gene are too short.  There can never be sufficient probes for
         % this isoform
         regsFound(t,:) = {geneIsoformList(t).name, maxFoundProbes, -2, []};
@@ -75,7 +75,7 @@ for t = 1:length(geneIsoformList)
     
     fprintf(printTarget, 'Target isoform has %d target regions\n', tRTrunc(whichEntry).numRegions);
     
-    if tRTrunc(whichEntry).numRegions <= minNumberOfProbes
+    if tRTrunc(whichEntry).numRegions < minNumberOfProbes
         % Selected isoform has too few targetRegions.
         % No solution exists for this isoform, but might for another
         % isoform.
@@ -103,7 +103,7 @@ for t = 1:length(geneIsoformList)
         % nb - if there are only 1 or 2 isoforms then the above test catches issues
         
         % Are there enough probes on target isoform with this score?
-        if sum(isospecRows) <= minNumberOfProbes
+        if sum(isospecRows) < minNumberOfProbes
             % If no, move to next-lowest isospecificity score
             
             fprintf(printTarget, 'Only %.d probes in isoform %s at isospecificity %f\n', ...
@@ -160,12 +160,12 @@ for t = 1:length(geneIsoformList)
         % isoforms, and then any rows with one or more '0's should be
         % all 0s.
         
-        if any(nGoodCommonIsoforms <= minNumberOfProbes)
+        if any(nGoodCommonIsoforms < minNumberOfProbes)
             % Which isoforms to exclude by this test
             %excludeIsoforms =  nGoodCommonIsoforms < minNumberOfProbes;
             % Print them here
             
-            nIsoformsHere(:, nGoodCommonIsoforms <= minNumberOfProbes) = [];
+            nIsoformsHere(:, nGoodCommonIsoforms < minNumberOfProbes) = [];
             
             nIsoformsHere(any(nIsoformsHere == 0, 2), :) = 0;
         end
@@ -176,7 +176,7 @@ for t = 1:length(geneIsoformList)
         
         % If target isoform has insufficient probes, move on to next
         % isospecificity value
-        if sum(probesToRetain) <= minNumberOfProbes
+        if sum(probesToRetain) < minNumberOfProbes
             
             fprintf(printTarget, 'Only %.d probes from isoform %s at isospecificity %f common across all isoforms\n', ...
                 sum(probesToRetain), geneIsoformList(t).id, isospecsHere(onIsospec));
