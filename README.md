@@ -18,6 +18,7 @@ Key edits and notes:
 - Add output of all probes ([libraryName]_AllOligos.fasta) generated in calculations.
 - Add output of message log ([libraryName].log) with error logging.
 - Begin implementation of reading on-disk files when specified (preliminary).
+- Additional options for filtering generated targetRegions.  Options for filtering by parameter (mimicking default), expanding isoSpecificity to generate desired number of probes, or selecting probes from common sequences across isoforms, when available. 
 
 -------------------------------------------------------------------------------------------
 
@@ -125,11 +126,23 @@ Required variables:
 												Used in oligomers build step.
                             doubleHeadedsmELT: Boolean.  If true, append same readout to both ends of transcript if number of probes for this gene < nProbesPerGene AND
 												Codebook has 1 positive bit for gene.  Used in oligomers build step. 
-                                 rRNAtRNAPath: String.  File path to previously-generated rRNAtRNAPath file.  Will be loaded if inputs in object match those of saved.
+						keepAllPossibleProbes: Boolean.  If true, output allOligos.fasta file containing all possible probe sequences.
+									debugMode: Boolean.  If true, assign useful variables to base workspace from MERFISHProbeDesign function.
+					 readoutPermuteBySequence: Boolean.  If true, use modulo of sequence to assign readouts to probe.  If false, use randperm().
+							   spaceOutProbes: Boolean.  If true, and probes > numProbesPerGene, select probes which are most spaced out.  If false, select randomly. 
+							  specifyReadouts: Boolean.  If true, use readout names specified in header of codebook file.  If false, use order from readouts.fasta file.
+						geneIsoformListSource: String. Source of gene + isoform pairs to filter in targetRegions filters. 'default', 'allGenes', or 'codebook'.
+                               tRFilterMethod: String. Method for filtering targetRegions. 'default', 'parameter','relaxIsospecificity', or 'commonRegions'.
+                                tRFilterField: String. If tRFilterMethod = 'parameter', which parameter field to filter over. 'regionLength','GC', 'Tm', 
+												'specificity', 'isoSpecificity', 'none'
+                           tRFilterParameters: [Double Double]. If tRFilterMethod = 'parameter', range for filtering targetRegions. 
+								rRNAtRNAPath: String.  File path to previously-generated rRNAtRNAPath file.  Will be loaded if inputs in object match those of
+													saved.             	 
                             transcriptomePath: String.  File path to previously-generated transcriptome object file.  Will be loaded if inputs in object match those of saved.
                          specificityTablePath: String.  File path to previously-generated specificity table object file.  Will be loaded if inputs in object match those of saved.
                       isoSpecificityTablePath: String.  File path to previously-generated isoSpecificity table object file.  Will be loaded if inputs in object match those of saved.
                                trDesignerPath: String.  File path to previously-generated trDesigner object folder.  Will be loaded if inputs in object match those of saved.
+							   
 ```
 Defaults in GitHub repo code:
 ```

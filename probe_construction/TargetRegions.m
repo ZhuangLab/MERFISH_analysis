@@ -95,23 +95,32 @@ methods
         for i=1:length(fieldsToTransfer)
             obj.(fieldsToTransfer{i}) = parameters.(fieldsToTransfer{i});
         end
-        
-        % -------------------------------------------------------------------------
-        % Parse sequences if a gene sequence is provided
-        % -------------------------------------------------------------------------
+ 
         obj.numRegions = length(obj.startPos);
-        if ~isempty(parameters.geneSequence) && ischar(parameters.geneSequence)
-            for i=1:obj.numRegions
-                obj.sequence{i} = parameters.geneSequence(...
-                    obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) );
+        % -------------------------------------------------------------------------
+        % Parse sequences if a gene sequence is provided as contiguous
+        % sequence
+        % -------------------------------------------------------------------------
+
+        if ~iscell(parameters.geneSequence)
+            obj.numRegions = length(obj.startPos);
+            if ~isempty(parameters.geneSequence) && ischar(parameters.geneSequence)
+                for i=1:obj.numRegions
+                    obj.sequence{i} = parameters.geneSequence(...
+                        obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) );
+                end
             end
-        end
-        if ~isempty(parameters.geneSequence) && ~ischar(parameters.geneSequence)
-            for i=1:obj.numRegions
-                obj.sequence{i} = obj.map(parameters.geneSequence(...
-                    obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) ) + 2);
-                % Note: 2 is added to map the unknown characters to 1. 
+            if ~isempty(parameters.geneSequence) && ~ischar(parameters.geneSequence)
+                for i=1:obj.numRegions
+                    obj.sequence{i} = obj.map(parameters.geneSequence(...
+                        obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) ) + 2);
+                    % Note: 2 is added to map the unknown characters to 1. 
+                end
             end
+        else
+            % Gene sequence is already cell array
+            % No need to parse
+            obj.sequence = parameters.geneSequence;
         end
     end    
 

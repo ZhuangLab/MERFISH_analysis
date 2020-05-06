@@ -114,6 +114,6 @@ fprintf(fid, '%s, %s, %s\n', 'name', 'id', 'barcode');
     % Close fid
     fclose(fid);
     
-else
-    error('Found existing codebook!');
+% else
+%     error('Found existing codebook!');
 end

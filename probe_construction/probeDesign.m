@@ -39,8 +39,7 @@ classdef probeDesign < matlab.mixin.SetGet
         probeConcentration {mustBeNumeric, mustBeNonnegative} = 5e-9; % mol/L
         probeSpacing {mustBeNumeric} = 3; % nt of gap between probes - set to negative to allow overlap
 
-        numProbesPerGene {mustBeNumeric, mustBeNonnegative} = 48;
-
+        numProbesPerGene = [48, 92];
 
         nPrimersToGenerate {mustBeNumeric, mustBeNonnegative} = 1e3;
         primerLength {mustBeNumeric, mustBeNonnegative} = 20;
@@ -59,6 +58,25 @@ classdef probeDesign < matlab.mixin.SetGet
         keepAllPossibleProbes {mustBeNumericOrLogical} = true;
         
         debugMode {mustBeNumericOrLogical} = false;
+        
+        readoutPermuteBySequence {mustBeNumericOrLogical} = true;
+        
+        % True - equally space valid probes along target sequence
+        % False - randomly sprinkle probes along target sequence
+        spaceOutProbes {mustBeNumericOrLogical} = false;
+        
+        % Use readouts explicitly specified in codebook file header as
+        % bit_names
+        % If false, use default readout ordering (first N sequences/names
+        % in readout.fasta file)
+        specifyReadouts {mustBeNumericOrLogical} = true;
+        
+        % Parameters for filtering targetRegions object beyond parameter
+        % thresholds
+        geneIsoformListSource char {mustBeMember(geneIsoformListSource,{'codebook','allGenes', 'default'})} = 'default';
+        tRFilterMethod char {mustBeMember(tRFilterMethod,{'parameter','relaxIsospecificity', 'default', 'commonRegions'})} = 'default';
+        tRFilterField char {mustBeMember(tRFilterField,{'regionLength','GC', 'Tm', 'specificity', 'isoSpecificity', 'none'})} = 'none';
+        tRFilterParameters = [0, -1];
         
         %---------------------------------------------------------------
         % Generated paths that could be reused if existing, things match
@@ -176,7 +194,6 @@ classdef probeDesign < matlab.mixin.SetGet
                           'monovalentSaltConcentration', ...
                           'probeConcentration', ...
                           'probeSpacing',...
-                          'numProbesPerGene', ...
                           'nPrimersToGenerate', ...
                           'primerLength', ...
                           'rRNAtRNAPath', ...
@@ -184,7 +201,10 @@ classdef probeDesign < matlab.mixin.SetGet
                           'specificityTablePath', ...
                           'isoSpecificityTablePath', ...
                           'trDesignerPath', ...
-						  'species'}
+						  'species', ...
+                          'geneIsoformListSource', ...
+                          'tRFilterMethod', ...
+                          'tRFilterField'}
                         
                         if all(isstrprop(ret{2}, 'digit') | (ret{2} == '.') | (ret{2} == 'e') | (ret{2} == '-'))
                             obj.(ret{1}) = str2double(ret{2});
@@ -192,17 +212,30 @@ classdef probeDesign < matlab.mixin.SetGet
                             obj.(ret{1}) = ret{2};
                         end
 
-                    case {'GC', 'Tm', 'isoSpecificity', 'specificity'}
+                    case {'numProbesPerGene'}
+                        % Could be single value or pair of doubles
+                        if all(isstrprop(ret{2}, 'digit'))
+                            % Single integer
+                            obj.numProbesPerGene = str2double(ret{2});
+                        else
+                            % Pair of integers
+                            obj.numProbesPerGene = str2double(strsplit(ret{2}(2:(end-1)), ','));
+                        end
+                    
+                    case {'GC', 'Tm', 'isoSpecificity', 'specificity', 'tRFilterParameters'}
                         
                         % To do - convert from strings to pairs of doubles
                         
                         
                         % could be readout or primer
                         if primerBlockFound
+
                             if strcmp(ret{1}, 'GC')
                                 obj.cutPrimersGC = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             elseif strcmp(ret{1}, 'Tm')
                                 obj.cutPrimersTm = str2double(strsplit(ret{2}(2:(end-1)), ','));
+                            elseif strcmp(ret{1}, 'tRFilterParameters')
+                                obj.tRFilterParameters = str2double(strsplit(ret{2}(2:(end-1)), ','));
                             else
                                 error('Bad value at primerBlockFound as true in switch-case');
                             end
@@ -236,7 +269,19 @@ classdef probeDesign < matlab.mixin.SetGet
 
                     case 'doubleHeadedsmELT'
                         % assignin('base', 'line2', ret)
-                        obj.doubleHeadedsmELT = (ret{2} == '1');
+                        obj.doubleHeadedsmELT = (ret{2} == '1'); % should final term be '0' or '1'?
+                        
+                    case 'keepAllPossibleProbes'
+                        obj.keepAllPossibleProbes = (ret{2} == '1');
+                    
+                    case 'specifyReadouts'
+                        obj.specifyReadouts = (ret{2} == '1');
+                        
+                    case 'readoutPermuteBySequence'
+                        obj.readoutPermuteBySequence = (ret{2} == '1');
+                        
+                    case 'spaceOutProbes'
+                        obj.spaceOutProbes = (ret{2} == '1');
                         
                 end
             end
@@ -285,7 +330,8 @@ classdef probeDesign < matlab.mixin.SetGet
                          'transcriptomePath', ...
                          'specificityTablePath', ...
                          'isoSpecificityTablePath', ...
-                         'trDesignerPath'}
+                         'trDesignerPath', ...
+                         'tRFilterField'}
                      % These properties can be empty at start.
                      
                      validProp(iprop) = 0;

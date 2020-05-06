@@ -121,7 +121,8 @@
         regionDesignParameters.probeConcentration = 5e-9; % mol/L
         regionDesignParameters.probeSpacing = 3; % nt of gap between probes - set to negative to allow overlap
 
-        numProbesPerGene = 48;
+        numProbesPerGene = [48, 92];  % Min-max values OK or single value. Min used in filtering, error messages. Will truncate to max.
+        spaceOutProbes = false;
 
 
         primerDesignParameters.nPrimersToGenerate = 1e3;
@@ -134,6 +135,11 @@
         primerDesignParameters.primerConcentration = 0.5e-6;
         
 
+        targetRegionsFilter.geneIsoformListSource = 'allGenes';
+        targetRegionsFilter.tRFilterMethod = 'default';
+        targetRegionsFilter.tRFilterField = '';
+        targetRegionsFilter.tRFilterParameters = [0, 1];
+        
         % Indicate if this is allowed to ignore sequence version number in matching
         versionMatch = false;
         
@@ -143,7 +149,14 @@
         
         keepAllPossibleProbes = true;
         
+        specifyReadouts = false;
+        
         debugMode = false;
+        
+        readoutPermuteBySequence = true; % If true, use fileIO/permuteBySequence to define readout order on a sequence
+                                         % If false, use default behavior
+                                         % where randPerm defines readout
+                                         % order.
         
     elseif (nargin == 1) && isa(varargin{1}, 'probeDesign')
         
@@ -225,6 +238,12 @@
         primerDesignParameters.primerMonovalentSaltConcentration = obj.primerMonovalentSaltConcentration;
         primerDesignParameters.primerConcentration = obj.primerConcentration;
 
+        targetRegionsFilter.geneIsoformListSource = obj.geneIsoformListSource;
+        targetRegionsFilter.tRFilterMethod = obj.tRFilterMethod;
+        targetRegionsFilter.tRFilterField = obj.tRFilterField;
+        targetRegionsFilter.tRFilterParameters = obj.tRFilterParameters;
+
+        
         % Indicate if this is allowed to ignore sequence version number in matching
         versionMatch = obj.versionMatch;
         
@@ -232,7 +251,13 @@
         
         keepAllPossibleProbes = obj.keepAllPossibleProbes;
         
+        specifyReadouts = obj.specifyReadouts;
+        
         debugMode = obj.debugMode;
+        
+        spaceOutProbes = obj.spaceOutProbes;
+        
+        readoutPermuteBySequence = obj.readoutPermuteBySequence;
         
     else
         error('MERFISHProbeDesign inputs incorrect.');
@@ -564,7 +589,15 @@
         fprintf(logFID, 'probeConcentration : %d\n', regionDesignParameters.probeConcentration);
         fprintf(logFID, 'probeSpacing : %d\n', regionDesignParameters.probeSpacing);
         fprintf(logFID, '\n');
-        fprintf(logFID, 'numProbesPerGene : %d\n', numProbesPerGene);
+        if numel(numProbesPerGene) == 1
+            fprintf(logFID, 'numProbesPerGene : %d\n', numProbesPerGene);
+        elseif numel(numProbesPerGene) == 2
+            fprintf(logFID, 'numProbesPerGene : [%d, %d]\n', numProbesPerGene(1), numProbesPerGene(2));
+        else
+            fclose(logFID);
+            error('Variable numProbesPerGene must be a single integer or 1 x 2 vector!');
+        end
+        fprintf(logFID, 'spaceOutProbes : %d\n', spaceOutProbes);
         fprintf(logFID, '\n');
         fprintf(logFID, 'primerDesignParameters\n');
         fprintf(logFID, 'nPrimersToGenerate : %d\n', primerDesignParameters.nPrimersToGenerate);
@@ -577,6 +610,16 @@
         fprintf(logFID, 'maxHomologyCross : %d\n', primerDesignParameters.cutPrimers.maxHomologyCross);
         fprintf(logFID, 'doubleHeadedsmELT : %d\n', doubleHeadedsmELT);
         fprintf(logFID, 'keepAllPossibleProbes : %d\n', keepAllPossibleProbes);
+        fprintf(logFID, 'specifyReadouts : %d\n', specifyReadouts);
+        fprintf(logFID, 'readoutPermuteBySequence : %d\n', readoutPermuteBySequence);
+        fprintf(logFID, '\n');
+        fprintf(logFID, 'targetRegionsFilter\n');
+        fprintf(logFID, 'geneIsoformListSource : %s\n', targetRegionsFilter.geneIsoformListSource);
+        fprintf(logFID, 'tRFilterMethod : %s\n', targetRegionsFilter.tRFilterMethod);
+        fprintf(logFID, 'tRFilterField : %s\n', targetRegionsFilter.tRFilterField);
+        fprintf(logFID, 'tRFilterParameters : [%d, %d]\n', targetRegionsFilter.tRFilterParameters);
+        
+        
         fprintf(logFID, '-----------------------------\n');
 
 
@@ -668,13 +711,15 @@
 
             fprintf(logFID, '%s - Building transcriptome object.\n', datestr(datetime));
 
-            % Build transcriptome using existing abundance data
+            %Build transcriptome using existing abundance data
             transcriptome = Transcriptome(rawTranscriptomeFasta, ...
                 'abundPath', fpkmPath, ...
                 'verbose', true, ...
                 'headerType', transcriptomeHeaderType, ...
                 'IDType', transcriptomeIDType);
-
+            %transcriptome = Transcriptome(rawTranscriptomeFasta, ...
+             %   'abundPath', fpkmPath, ...
+              %  'verbose', true);
             transcriptome.Save(transcriptomePath);
             fprintf(logFID, '%s - Transcriptome object saved to %s\n', datestr(datetime), transcriptomePath);
         
@@ -726,7 +771,7 @@
                     % Generate a OTTable for isoforms for the given gene
                     isoSpecificityTables(i) = OTTable(localTranscriptome, ...
                         isoSpecificityTable_lengthOfExactHomology, ...  % lengthOfExactHomology is the length of exact homology used to calculate penalties
-                        'verbose', false, ...
+                        'verbose', false, ...                        
                         'transferAbund', false);
 
                 else
@@ -806,7 +851,7 @@
         %% Create parallel pool... speeds up the construction of the TRDesigner and the construction of libraries
         if isempty(gcp('nocreate'))
             fprintf(logFID, '%s - Start parallel processing pool\n', datestr(datetime));
-            p = parpool(5);  % Insert a number here appropriate to the used computational resources
+            p = parpool(4);  % Insert a number here appropriate to the used computational resources
         else
             p = gcp;
         end
@@ -866,6 +911,7 @@
 		% Can clear transcriptome object from memory at this point
 		clear transcriptome;
 		
+        
 		
         %% Create Target Region Designer object
         if ~exist(trDesignerPath)
@@ -894,6 +940,12 @@
         % Create target regions for a specific set of probe properties
         %%-------------------------------------------------------------------------
         
+        % Can clear large objects from memory at this point
+        clear specificityTable
+        clear isoSpecificityTable
+     %   clear slicedTranscriptome
+%         clear OTrRNA15   - used to calc penalties for ncRNA later! 
+        drawnow;
         
         
         % Apparent that if trRegionsPath object exists and is correct, nothing upstream needs to be loaded.
@@ -923,7 +975,7 @@
         % 		'specificity', [0.75 1], ...
         % 		'OTTables', {'rRNA', [0, 0]});
 
-            fprintf(logFID, '%s - Designing target regions %s\n', datestr(datetime));
+            fprintf(logFID, '%s - Designing target regions\n', datestr(datetime));
 
                 targetRegions = trDesigner.DesignTargetRegions(...
                 'regionLength', regionDesignParameters.regionLength, ...
@@ -934,7 +986,8 @@
                 'monovalentSalt', regionDesignParameters.monovalentSaltConcentration, ...
                 'probeConc', regionDesignParameters.probeConcentration, ...
                 'threePrimeSpace', regionDesignParameters.probeSpacing, ...
-                'OTTables', {'rRNA', [0, 0]});
+                'OTTables', {'rRNA', [0, 0]},...
+                'debugMode', debugMode);
 
                     % NOTE: The ranges above were determined empirically to strike 
                     % the proper balance between stringency (narrow ranges) and 
@@ -956,12 +1009,114 @@
             fprintf(logFID, '%s - Target regions loaded from %s\n', datestr(datetime), trRegionsPath);
         end
 
+        %write the genename
+        genenames={targetRegions.geneName}';
+        geneids={targetRegions.id}';
+        numRegions={targetRegions.numRegions}';
+        writetable(table(genenames,geneids,numRegions),[analysisSavePath 'targetRegions.csv'],'WriteRowNames',false)
         %% ------------------------------------------------------------------------
         % Step 2: Compile the library 
         %  The target regions designed above will be compiled into template
         %  molecules that can be used to build the desired probe library
         %%-------------------------------------------------------------------------
 
+        
+        %% ------------------------------------------------------------------------
+        % Filter targetRegions 
+        %%-------------------------------------------------------------------------
+        % If steps above were not sufficiently restrictive for
+        % targetRegions design
+        % -- OR -- 
+        % you want to implement a new way of filtering targetRegions, do so here.
+        
+        fprintf(1, '%s - Filtering target regions\n', datestr(datetime));
+        fprintf(logFID, '%s - Filtering target regions\n', datestr(datetime));
+
+        fprintf(1, '%s - Populating geneIsoformList from %s\n', datestr(datetime), targetRegionsFilter.geneIsoformListSource);
+        fprintf(logFID, '%s - Populating geneIsoformList from %s\n', datestr(datetime), targetRegionsFilter.geneIsoformListSource);
+        
+        % Can filter to only those genes in the codebook, 
+        % or to top abundance isoform of all genes
+        switch targetRegionsFilter.geneIsoformListSource
+            
+
+
+            case 'codebook'
+
+                % Pull target isoforms for each gene
+                [geneIsoformList, ~] = LoadCodebook(codebookPath, 'verbose', true);
+
+
+            case 'allGenes'
+                % Do a filtering for ALL TargetRegions in the slicedTranscriptome
+                allGeneNames = slicedTranscriptome.GetNames();
+                geneIsoformList(length(allGeneNames)) = struct('name', '', ...
+                                                               'id', '');
+                for k = 1:length(allGeneNames)
+                    idsHere = slicedTranscriptome.GetIDsByName(allGeneNames{k});
+                    abundsHere = slicedTranscriptome.GetAbundanceByID(idsHere{1});
+                    topAbundanceIsoform = idsHere{1}{abundsHere == max(abundsHere)};
+
+                    geneIsoformList(k).name = allGeneNames{k};
+                    % Include only most abundant isoform
+                    geneIsoformList(k).id = topAbundanceIsoform;
+                end
+                
+            case 'default'
+                % No filtering to do, so this can be default
+
+            otherwise
+                error('geneListDefinedBy must be "codebook" or "allGenes"\n');
+        end
+        
+        
+        fprintf(1, '%s - Filtering targetRegions by method %s\n', datestr(datetime), targetRegionsFilter.tRFilterMethod);
+        fprintf(logFID, '%s - Filtering targetRegions by method %s\n', datestr(datetime), targetRegionsFilter.tRFilterMethod);
+        
+        
+        switch targetRegionsFilter.tRFilterMethod
+            case ('default')
+                % Do nothing.  Trust upstream filtering approach
+                
+            case ('parameter')
+                % Filter by defined parameter
+                
+                targetRegions = findFilteredTargetRegions(targetRegions, ...
+                                                          geneIsoformList, ...
+                                                          min(numProbesPerGene(:)), ...
+                                                          logFID, ...
+                                                          targetRegionsFilter.tRFilterField, ...
+                                                          targetRegionsFilter.tRFilterParameters);
+                                                      
+            case ('relaxIsospecificity')
+                % Return regions of genes that have min isospecificity to
+                % yield at least minNumberOfProbes on each target isoform
+                
+                targetRegions = findExpandedIsospecificityTargetRegions(targetRegions, ...
+                                        geneIsoformList, ...
+                                        min(numProbesPerGene(:)), ... 
+                                        logFID);
+                
+            case ('commonRegions')
+                % Return regions of genes that are common across isoforms
+                % and each isoform carries 0 or at least minNumberOfProbes
+                % targetRegions.
+                
+                targetRegions = findCommonTargetRegions(targetRegions, ...
+                                                        geneIsoformList, ...
+                                                        min(numProbesPerGene(:)), ... 
+                                                        logFID);
+                
+                
+            otherwise
+                error('obj.targetRegionsFilter.method incorrectly specified');
+        end
+        
+       fprintf(1, '%s - TargetRegions filtering complete!\n', datestr(datetime)); 
+       fprintf(logFID, '%s - TargetRegions filtering complete!\n', datestr(datetime));
+        
+
+        
         %% ------------------------------------------------------------------------
         % Load readouts, target regions, codewords, and selected genes
         %%-------------------------------------------------------------------------
@@ -982,28 +1137,75 @@
 
         fprintf(logFID, '%s - Loading codebook from %s\n', datestr(datetime), codebookPath);
 
-        codebook = LoadCodebook(codebookPath);
+        [codebook, codebookHeader] = LoadCodebook(codebookPath, 'verbose', true);
            % NOTE: A codebook should be defined before the library is constructed. 
            % NOTE: See the code_construction example script for instructions on how
            % to generate barcodes for different encoding schemes
+           
+           
+        
+        if specifyReadouts
+        % ------------------------------------------------------------------------
+        % Select readouts from readouts.fasta file
+        % Put in order as specified from codebook
+        %------------------------------------------------------------------------- 
+        
+        fprintf(logFID, '%s - Trimming readouts to specified list from codebook.\n', datestr(datetime), codebookPath);
+        
+        % Make ordered list of readouts given readouts.fasta, codebook
+        
+        readoutOrder = zeros(length(codebookHeader.bit_names), 1);
+        for k = 1:length(readoutOrder)
+           
+            readoutFound = find(~cellfun(@isempty, strfind(cellstr(vertcat(readouts.Header)), codebookHeader.bit_names{k})), 1);
+            
+            if isempty(readoutFound)
+               fprintf(logFID, '%s - Readout %s is in codebook but not in readouts.fasta file.\n', datestr(datetime), codebookHeader.bit_names{k});
+               error('Readout %s is in codebook but not in readouts.fasta file.', codebookHeader.bit_names{k}); 
+            else
+                readoutOrder(k) = readoutFound;
+            end
 
-        %% ------------------------------------------------------------------------
+        end
+        
+        % Trim readouts struct down to the ones we want to use, in order.
+        readouts = readouts(readoutOrder);
+        
+        fprintf(logFID, '%s - Retaining readouts .\n', datestr(datetime), codebookPath);
+        
+        else
+            fprintf(logFID, '%s - Using default readout ordering.\n', datestr(datetime), codebookPath);
+            
+            % Nothing else necessary to do here.  Ordering in
+            % readouts.fasta file will be used regardless of codebook
+            % bit_names specification. 
+        end
+        
+  
+        % ------------------------------------------------------------------------
         % Select isoforms
-        %%-------------------------------------------------------------------------
-        %% Identify the isoforms to keep from those requested in the codebook
+        %-------------------------------------------------------------------------
+        % Identify the isoforms to keep from those requested in the codebook
         finalIds = {codebook.id}; % Extract isoform ids from codebook
 
         % For codebooks that use a transcript spanning multiple IDs, there is a
         % string miss-match.  Replacing '_' with ',' in original codebook solves
         % this issue.
 
-        if ~strcmp(transcriptomeIDType, 'NCBI')
-            finalIds = strrep(finalIds, '_', ',');
-        end
+        %if ~strcmp(transcriptomeIDType, 'NCBI')
+         %   finalIds = strrep(finalIds, '_', ',');
+        %end
 
         finalGenes = {codebook.name}; % Extract gene common names from codebook
         barcodes = char({codebook.barcode}) == '1'; % Extract string barcodes and convert to logical matrix
 
+        %check if gene and ids match the reference
+        genes_from_ids=targetRegions(ismember({targetRegions.id}, finalIds));
+        genenames=targetRegions(ismember({targetRegions.geneName}, finalGenes));
+        if length(setdiff({genenames.geneName},{genes_from_ids.geneName}))>0
+        warning([char(setdiff({genenames.geneName},{genes_from_ids.geneName})),' ',char(setdiff({genes_from_ids.id},{genenames.id})),' is different from the reference']);
+        fprintf(logFID, ['WARNING! ', char(setdiff({genenames.geneName},{genes_from_ids.geneName})),' ',char(setdiff({genes_from_ids.id},{genenames.id})),' is different from the reference\n']);
+        end
 
         if versionMatch
             finalTargetRegions = targetRegions(ismember({targetRegions.id}, finalIds)); % Extract only the desired target regions
@@ -1039,6 +1241,9 @@
 
 
         end
+        
+
+        
 
         %% ------------------------------------------------------------------------
         % Construct the library
@@ -1048,8 +1253,8 @@
         PageBreak();
         display(['Designing oligos for ' libraryName]);
         fprintf(logFID, '%s - Desgining oligos for %s\n', datestr(datetime), libraryName);
-        display(['... ' num2str(numProbesPerGene) ' probes per gene']);
-        fprintf(logFID, '%s - Using %d probes per gene\n', datestr(datetime), numProbesPerGene);
+        display(['... ' num2str(max(numProbesPerGene(:))) ' probes per gene']);
+        fprintf(logFID, '%s - Using %d probes per gene\n', datestr(datetime), max(numProbesPerGene(:)));
 
         %% Record the used readout sequences
         
@@ -1076,13 +1281,16 @@
         if keepGoingFlag
             oligos = [];
 
+            allOligos = [];
             lastGene = '';
             
-            if keepAllPossibleProbes
-                allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
-                allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
-                seqCount = 1;
-            end
+            Genes={};
+            ProbeNumbers={};  
+            %if keepAllPossibleProbes
+             %   allHeaders = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+              %  allSeqs = cell(sum(vertcat(finalTargetRegions.numRegions)), 1);
+               % seqCount = 1;
+            %end
 
             for i=1:length(finalIds)
                 % Save local gene
@@ -1139,6 +1347,7 @@
                                     localReadouts(2).Sequence = '';
                                     localReadouts(3).Header = '';
                                     localReadouts(3).Sequence = '';
+                                    longSide = 0;
 
                                 % 2-hot readout testing, smELT style
                                 elseif (sum(barcodes(i, :)) == 2) 
@@ -1146,15 +1355,27 @@
                                     localReadouts(2).Header = '';
                                     localReadouts(2).Sequence = ''; 
                                     localReadouts(3) = possibleReadouts(2);
-                                    
+                                    longSide = 0;
                                 else
-                                    % Create random orientation and selection of readouts
-                                    localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                                    
+                                    if readoutPermuteBySequence
+                                        % Use permuteBySequence to generate
+                                        % pseudo-random readout order
+                                        [readoutOrder, whichPermute] = permuteBySequence(uint8(tRegion.sequence{nR}), sum(barcodes(i, :)), 3);
+                                        localReadouts = possibleReadouts(readoutOrder); 
+                                        % Use whichPermute to decide which
+                                        % side has 2 readouts vs 1 readout.
+                                        longSide = mod(whichPermute, 2) == 0;
+                                    else
+                                        % Create random orientation and selection of readouts
+                                        localReadouts = possibleReadouts(randperm(length(possibleReadouts), 3));
+                                        longSide = rand(1);
+                                    end
                                 end
 
 
 
-                                if rand(1) > 0.5
+                                if longSide > 0.5
                                     % Create header 
                                     headers{p} = [libraryName ' ' ...
                                         localReadouts(1).Header ' ' ...
@@ -1217,18 +1438,39 @@
                                 display(['...     ' headers{indsToRemove(r)}]);
                             end
 
+
             %                 display(indsToKeep)
 
-                            indsToKeepForReal = [indsToKeepForReal, indsToKeep];
-
+                            %indsToKeepForReal = [indsToKeepForReal, indsToKeep];
+                            indsToKeepForReal =  indsToKeep;
                         end
+                           indsToKeepForAll = indsToKeepForReal(1:length(indsToKeepForReal));
+                           
+                        
+                        % To implement   
+                        % If oligos to this point > max(numProbesPerGene(:)), 
+                        % Select which oligos will survive
+                        % Default is random selection
+                        % 'spread' is use linspace, get probes equally
+                        % spaced along molecule.
+                           
+                        
+                        if spaceOutProbes   
+                            indsToKeepForReal = indsToKeepForReal(round(linspace(1, length(indsToKeepForReal), min([length(indsToKeepForReal) max(numProbesPerGene(:))]))));
+                        else
+                            indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) max(numProbesPerGene(:))])));
+                        end
+                        
 
-                        indsToKeepForReal = indsToKeepForReal(randperm(length(indsToKeepForReal), min([length(indsToKeepForReal) numProbesPerGene])));
+                        
                         display(['... keeping ' num2str(length(indsToKeepForReal)) ' probes']);
                         fprintf(logFID, '%s - Retaining %d probes\n', datestr(datetime), length(indsToKeepForReal));
+                        %write the genename
+                        Genes=[Genes,localGeneName];
+                        ProbeNumbers=[ProbeNumbers,length(indsToKeepForReal)];       
 
                         % Check on number
-                        if length(indsToKeepForReal) < numProbesPerGene
+                        if length(indsToKeepForReal) < min(numProbesPerGene(:))
                             warning(' ');
                             display(['Not enough probes for ' num2str(i) ': ' tRegion.geneName]);
                             fprintf(logFID, '%s - Not enough probes for %s!\n', datestr(datetime), tRegion.geneName);
@@ -1294,13 +1536,17 @@
                             oligos(end+1).Header = headers{indsToKeepForReal(s)};
                             oligos(end).Sequence = seqs{indsToKeepForReal(s)};
                         end
-                        
-                        if keepAllPossibleProbes
-                            % Append all headers + seqs to cell
-                            allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
-                            allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
-                            seqCount = seqCount + length(seqs);
+                        for s=1:length(indsToKeepForAll)
+                            allOligos(end+1).Header = headers{indsToKeepForAll(s)};
+                            allOligos(end).Sequence = seqs{indsToKeepForAll(s)};
                         end
+
+                        %if keepAllPossibleProbes
+                            % Append all headers + seqs to cell
+                         %   allHeaders(seqCount:(seqCount + length(headers) - 1)) = headers;
+                          %  allSeqs(seqCount:(seqCount + length(seqs) - 1)) = seqs;
+                           % seqCount = seqCount + length(seqs);
+                        %end
 
 
                     else
@@ -1322,17 +1568,20 @@
             fastawrite(possibleOligosPath, oligos);
             display(['... completed in ' num2str(toc(writeTimer))]);
             fprintf(logFID, '%s - Completed in %d s\n', datestr(datetime), toc(writeTimer));
-            
+            %%%%%Write out how many probes per gene as a table
+            Genes=Genes';
+            ProbeNumbers=ProbeNumbers';
+            writetable(table(Genes,ProbeNumbers),[analysisSavePath 'probesPerGeneMergedCode.csv'],'WriteRowNames',false);
+             
             if keepAllPossibleProbes
                 if obj.debugMode
-                    assignin('base', 'allHeaders', allHeaders);
-                    assignin('base', 'allSeqs', allSeqs);
+                    assignin('base', 'allOligos', allOligos);
                 end
                 
-                allSeqs(cellfun(@isempty, allHeaders)) = [];
-                allHeaders(cellfun(@isempty, allHeaders)) = [];
+                %allSeqs(cellfun(@isempty, allHeaders)) = [];
+                %allHeaders(cellfun(@isempty, allHeaders)) = [];
                 
-                allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
+                %allOligos = cell2struct([allHeaders, allSeqs], {'Header', 'Sequence'}, 2);
                 
                 PageBreak();
                 fprintf(1, 'Writing: %s\n', allOligosPath);
