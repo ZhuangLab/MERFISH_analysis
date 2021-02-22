@@ -17,6 +17,7 @@ classdef TRDesigner < handle
 % -------------------------------------------------------------------------
 properties 
     verbose 	% A boolean that determines whether the class displays progress
+    debugMode   % boolean for extra debug features
 end
 
 properties (SetAccess=protected)
@@ -67,6 +68,7 @@ methods
         % Define defaults
         defaults = cell(0,3); 
         defaults(end+1,:) = {'verbose', 'boolean', true}; % Display progress of construction
+        defaults(end+1,:) = {'debugMode', 'boolean', false}; % Display progress of construction
         defaults(end+1,:) = {'transcriptome', 'freeType', []};
         defaults(end+1,:) = {'OTTables', 'freeType', []};
         defaults(end+1,:) = {'OTTableNames', 'cell', {}};
@@ -78,6 +80,7 @@ methods
         % Parse variable input
         parameters = ParseVariableArguments(varargin, defaults, mfilename);
         
+        
         % Transfer values to object
         f = setdiff(fields(parameters), {'parallel', 'OTTableNames', 'OTTables', 'forbiddenSeqs'});
         for i=1:length(f)
@@ -85,6 +88,8 @@ methods
         end
         % Set parallel pool object
         SetParallel(obj, parameters.parallel); 
+        
+
         
         % -------------------------------------------------------------------------
         % Initialize all parameters for empty constructor case
@@ -288,7 +293,7 @@ methods
         end
 
         % Save penalty
-        obj.penalties{end+1} = penalty; 
+        obj.penalties{end+1} = penalty; % Can't linearize as OT Table names have to line up with indices of penalties.
         
         % -------------------------------------------------------------------------
         % Display progress
@@ -388,7 +393,11 @@ methods
                 end
                 
                 % Calculate isoform adjusted specificity
+                
                 isoCounts = localTable.CalculatePenalty(obj.transcriptome.intSequences{s});
+                % ^ Runs into problems when more than 1 localTable for a
+                % given geneName
+                
                 obj.isoSpecificity{s} = normalization(s)./isoCounts;
                 obj.specificity{s} = isoCounts./ ... 
                     obj.specificityTable.CalculatePenalty(obj.transcriptome.intSequences{s});
@@ -803,15 +812,22 @@ methods
         defaults(end+1,:) = {'includeSequence', 'boolean', true};
         defaults(end+1,:) = {'threePrimeSpace', 'integer', 0};
         defaults(end+1,:) = {'removeForbiddenSeqs', 'boolean', false};
+        defaults(end+1,:) = {'debugMode', 'boolean', false};
         
         % Parse variable inputs
         parameters = ParseVariableArguments(varargin, defaults, mfilename);
-                
+
         % -------------------------------------------------------------------------
         % Get internal indices for the requested transcripts
         % -------------------------------------------------------------------------
         inds = obj.transcriptome.GetInternalInds('parameters', parameters);
-        
+%         
+%         assignin('base', 'parameters', parameters);
+%         assignin('base', 'inds', inds);
+%         
+%         drawnow;
+%         return;
+%         
         % -------------------------------------------------------------------------
         % Handle case of no valid requested transcripts
         % -------------------------------------------------------------------------
@@ -825,7 +841,7 @@ methods
         % -------------------------------------------------------------------------
         % Initialize variables for loops
         % -------------------------------------------------------------------------
-        targetRegions = [];
+%         targetRegions = [];
         indsToKeep = cell(length(parameters.regionLength), length(inds));
         
         % -------------------------------------------------------------------------
@@ -850,6 +866,10 @@ methods
                 penalties(l,p,:) = obj.GetRegionPenalty(parameters.regionLength(l), ...
                     obj.OTTableNames{p}, 'inds', inds);
             end
+            
+            assignin('base', 'inds', inds);
+            assignin('base', 'parameters', parameters);
+            
             specificity(l,:) = obj.GetRegionSpecificity(parameters.regionLength(l), 'inds', inds);
             isoSpecificity(l,:) = obj.GetRegionIsoSpecificity(parameters.regionLength(l), 'inds', inds);
             
@@ -883,15 +903,49 @@ methods
                 end
             end
             if ~isempty(parameters.specificity)
+
                 for i=1:length(specificity)
-                    indsToKeep{l,i} = indsToKeep{l,i} & specificity{l,i} >= (parameters.specificity(1)-numPad) ...
-                        & specificity{l,i} <= (parameters.specificity(2)+numPad);
+                    if isempty(specificity{l, i})
+                        % If specificity is empty, it's because sequence is
+                        % too short to calc a penalty.  Should yield a
+                        % bunch of '0's for indsToKeep.
+                        % Guessing on what gives right length here and
+                        % conditional for 'too short'.
+                        
+                        if (numel(obj.transcriptome.intSequences{i})) < parameters.regionLength
+                            % Region is very short
+                            indsToKeep{l,i} = false;
+                            
+                        else
+                            
+                           indsToKeep{l, i} = zeros(1, numel(obj.transcriptome.intSequences{i}) - parameters.regionLength + 1, 'logical');
+                            
+                        end
+                        
+                        
+                    else
+                        indsToKeep{l,i} = indsToKeep{l,i} & specificity{l,i} >= (parameters.specificity(1)-numPad) ...
+                            & specificity{l,i} <= (parameters.specificity(2)+numPad);
+                    end
                 end
             end
             if ~isempty(parameters.isoSpecificity)
                 for i=1:length(isoSpecificity)
-                    indsToKeep{l,i} = indsToKeep{l,i} & isoSpecificity{l,i} >= (parameters.isoSpecificity(1)-numPad) ...
-                        & isoSpecificity{l,i} <= (parameters.isoSpecificity(2)+numPad);
+                        
+                        % As above, if isoSpecificity is empty, it's because sequence is
+                        % too short to calc a penalty.  Should yield a
+                        % bunch of '0's for indsToKeep.
+                    if isempty(isoSpecificity{l,i})
+                        if (numel(obj.transcriptome.intSequences{i})) < parameters.regionLength
+                            % Region is very short
+                            indsToKeep{l,i} = false;
+                        else
+                           indsToKeep{l, i} = zeros(1, numel(obj.transcriptome.intSequences{i}) - parameters.regionLength + 1, 'logical');
+                        end
+                    else
+                        indsToKeep{l,i} = indsToKeep{l,i} & isoSpecificity{l,i} >= (parameters.isoSpecificity(1)-numPad) ...
+                            & isoSpecificity{l,i} <= (parameters.isoSpecificity(2)+numPad);
+                    end
                 end
             end
             if ~isempty(parameters.OTTables)
@@ -901,8 +955,27 @@ methods
                         error('matlabFunctions:invalidArguments', 'Unrecognized OTTable name');
                     end
                     for i=1:length(inds)
-                        indsToKeep{l,i} = indsToKeep{l,i} & penalties{l,pid,i} >= (parameters.OTTables{2*t}(1)-numPad) ...
-                            & penalties{l,pid,i} <= (parameters.OTTables{2*t}(2)+numPad);
+                        
+                        % Conditional as above.  If penalty is empty,
+                        % sequence too short to have OK indices. Set all to
+                        % 0. 
+                        
+                        if isempty(penalties{l,pid,i})
+                            indsToKeep{l, i} = zeros(1, numel(obj.transcriptome.intSequences{i}) - parameters.regionLength + 1, 'logical');
+                        else
+                            try 
+                                indsToKeep{l,i} = indsToKeep{l,i} & penalties{l,pid,i} >= (parameters.OTTables{2*t}(1)-numPad) ...
+                                    & penalties{l,pid,i} <= (parameters.OTTables{2*t}(2)+numPad);
+                            
+                            catch mError
+                                assignin('base', 'penalties', penalties);
+                                assignin('base', 'pid', pid);
+                                assignin('base', 't', t);
+                                assignin('base', 'i', i);
+                                display('Failed on penalties from OTTable section.');
+                                rethrow(mError);
+                            end
+                        end
                     end
                 end
             end
@@ -929,7 +1002,7 @@ methods
         % -------------------------------------------------------------------------
         % Prepare variables for parfor
         % -------------------------------------------------------------------------
-        targetRegions = cell(1, length(inds));
+%         targetRegions = cell(1, length(inds)); % Do not pre-allocate as cell
         regionLength = parameters.regionLength;
         threePrimeSpace = parameters.threePrimeSpace;
         ids = obj.transcriptome.ids(inds);
@@ -939,7 +1012,44 @@ methods
         % -------------------------------------------------------------------------
         % Loop over objects in parallel
         % -------------------------------------------------------------------------
-        parfor (i=1:length(inds), obj.numPar)   
+        
+        
+%         if parameters.debugMode
+%             fprintf(1, 'Assigning TRDesigner variables in main workspace.\n');
+%             assignin('base', 'targetRegionsBuilding', targetRegions);
+%         end
+        
+        
+        % 20200129 memory error fix plan:
+        % Pre-allocate targetRegions to length of inds
+        % Remove need to flatten. 
+        % Flatten step looks to be where memory error would arise due to
+        % array duplication.
+        
+        % Initialize targetRegions object
+        targetRegions(length(inds)) = TargetRegions('geneName', '', ...
+            'id', '', ...
+            'sequence', {}, ...
+            'startPos', [], ...
+            'regionLength', [], ...
+            'GC', [], ...
+            'Tm', [], ...
+            'specificity', [], ...
+            'isoSpecificity', [], ...
+            'penalties', [], ...
+            'penaltyNames', {});
+        
+        parfor (i=1:length(inds), obj.numPar)   % Get out of memory errors in this section
+                                                % Maybe because portions
+                                                % continue to get added to
+                                                % localProps instead of
+                                                % pre-allocated?
+                                                
+            
+            if parameters.debugMode
+                fprintf(1, 'Building region %d.\n', i); 
+            end
+            
             % Compile region properties
             regionProps = zeros(6,0);
             for l=1:length(regionLength)
@@ -956,12 +1066,21 @@ methods
                 end
             end
             
+            if parameters.debugMode
+                fprintf(1, 'Complete region props for %d.\n', i);
+            end
+            
             % Tile regions and return properties of selected regions
             selectedRegionProps = TRDesigner.TileRegions(regionProps, ...
                 threePrimeSpace);
             
+            if parameters.debugMode
+                fprintf(1, 'Tiled regions for region %d.\n', i);
+            end
+            
             % Build a new target region object
-            newTR = TargetRegions('id', ids{i}, ...
+            % Directly address location in pre-allocated array of objects
+            targetRegions(i) = TargetRegions('id', ids{i}, ...
                 'geneName', geneNames{i}, ...
                 'geneSequence', intSequences{i}, ...
                 'startPos', selectedRegionProps(1,:), ...
@@ -971,20 +1090,43 @@ methods
                 'specificity',selectedRegionProps(5,:), ...
                 'isoSpecificity', selectedRegionProps(6,:));
             
+            if parameters.debugMode
+                fprintf(1, 'Built target regions for region %d.\n', i);
+            end
+            
             % Append to growing list of target regions
-            targetRegions{i} = newTR;
+            % No need to append as array is directly addressed
+%             targetRegions{i} = newTR;
+            
+            
+            if parameters.debugMode
+                fprintf(1, 'Appended target regions for region %d.\n', i);
+            end
         end
         
         % -------------------------------------------------------------------------
         % Flatten objects
         % -------------------------------------------------------------------------
-        targetRegions = [targetRegions{:}];
+        if parameters.debugMode
+            fprintf(1, 'Flattening target regions...');
+            fprintf(1, 'Assigning pre-flattened targetRegions variable in main workspace.\n');
+            assignin('base', 'targetRegionsNotFlat', targetRegions);
+        end
+        try
+            % No need to flatten as array is already created.
+%             targetRegions = [targetRegions{:}];
+            fprintf(1, 'TargetRegions flattened!\n');
+        catch me
+            fprintf(1, 'Error in flattening target regions!\n');
+            rethrow(me);
+        end
+        
         
         % -------------------------------------------------------------------------
         % Display progress
         % -------------------------------------------------------------------------
         if obj.verbose
-            display(['... completed in ' num2str(toc(timer2)) ' s']);
+            fprintf(1, '... completed in %s s\n', num2str(toc(timer2)));
         end        
     end
         
@@ -1029,9 +1171,38 @@ methods
                     obj.isoSpecificityTables.Save([dirPath 'isoSpecificityTables']);
                 case 'transcriptome'
                     obj.transcriptome.Save([dirPath 'transcriptome']);
+                    
+                case 'penalties'
+                    
+                    tempField = obj.penalties; % Duplicate field to avoid BS w/ MATLAB save function
+                    save(fullfile(dirPath, 'penalties.mat'), 'tempField', '-v7.3');
+                    clear tempField;
+                    
                 otherwise
-                    SaveAsByteStream([dirPath fieldsToSave{i} '.matb'], ...
-                        obj.(fieldsToSave{i}), 'verbose', obj.verbose);
+                    
+                    tempField = obj.(fieldsToSave{i});
+                    tFprops = whos('tempField');
+                    
+                    if tFprops.bytes > (2^(32 - 18))
+                       % File is too big and has to be saved in parts
+                       % Limiting part size to 2^14 entries.
+                       %
+                       % LoadSplitByteStream is invoked on
+                       % these files later.
+                       
+                       SaveSplitByteStream([dirPath fieldsToSave{i} '.matb'], ...
+                            obj.(fieldsToSave{i}), ...  
+                            (2^(32 - 18)), ...% Chunk size.  Very conservative. Yields ~0.5-1GB file sizes.
+                            'verbose', obj.verbose);
+                        
+                    else
+                        % File small enough to deal with using normal
+                        % approach
+                        
+                        SaveAsByteStream([dirPath fieldsToSave{i} '.matb'], ...
+                            obj.(fieldsToSave{i}), 'verbose', obj.verbose);
+                        
+                    end
             end
         end
     end
@@ -1088,9 +1259,32 @@ methods (Static)
                     obj.isoSpecificityTables = OTTable.Load([dirPath 'isoSpecificityTables']);
                 case 'transcriptome'
                     obj.transcriptome = Transcriptome.Load([dirPath 'transcriptome']);
+                    
+                case 'penalties'
+                    
+                    tF = load(fullfile(dirPath, 'penalties.mat'), 'tempField');
+                    obj.penalties = tF.tempField;
+                    clear tF;
+                    
                 otherwise
                     obj.(fieldsToLoad{i}) = LoadByteStream([dirPath fieldsToLoad{i} '.matb'], ...
                     'verbose', true);
+                
+                    if isstruct(obj.(fieldsToLoad{i}))
+                        % Could be a split byte stream where only directory
+                        % was loaded before.
+                        if isfield(obj.(fieldsToLoad{i}), 'isByteStream')
+                            if obj.(fieldsToLoad{i}).isByteStream == 'Y'
+                            
+                                obj.(fieldsToLoad{i}) = LoadSplitByteStream(fullfile(dirPath, strcat(fieldsToLoad{i}, '.matb')), ...
+                                                    'verbose', true);
+                                
+                            end
+                        end
+                        
+                        
+                    end
+                
             end
         end
     end

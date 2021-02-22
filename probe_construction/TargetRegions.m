@@ -95,23 +95,32 @@ methods
         for i=1:length(fieldsToTransfer)
             obj.(fieldsToTransfer{i}) = parameters.(fieldsToTransfer{i});
         end
-        
-        % -------------------------------------------------------------------------
-        % Parse sequences if a gene sequence is provided
-        % -------------------------------------------------------------------------
+ 
         obj.numRegions = length(obj.startPos);
-        if ~isempty(parameters.geneSequence) && ischar(parameters.geneSequence)
-            for i=1:obj.numRegions
-                obj.sequence{i} = parameters.geneSequence(...
-                    obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) );
+        % -------------------------------------------------------------------------
+        % Parse sequences if a gene sequence is provided as contiguous
+        % sequence
+        % -------------------------------------------------------------------------
+
+        if ~iscell(parameters.geneSequence)
+            obj.numRegions = length(obj.startPos);
+            if ~isempty(parameters.geneSequence) && ischar(parameters.geneSequence)
+                for i=1:obj.numRegions
+                    obj.sequence{i} = parameters.geneSequence(...
+                        obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) );
+                end
             end
-        end
-        if ~isempty(parameters.geneSequence) && ~ischar(parameters.geneSequence)
-            for i=1:obj.numRegions
-                obj.sequence{i} = obj.map(parameters.geneSequence(...
-                    obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) ) + 2);
-                % Note: 2 is added to map the unknown characters to 1. 
+            if ~isempty(parameters.geneSequence) && ~ischar(parameters.geneSequence)
+                for i=1:obj.numRegions
+                    obj.sequence{i} = obj.map(parameters.geneSequence(...
+                        obj.startPos(i):(obj.startPos(i) + obj.regionLength(i) - 1) ) + 2);
+                    % Note: 2 is added to map the unknown characters to 1. 
+                end
             end
+        else
+            % Gene sequence is already cell array
+            % No need to parse
+            obj.sequence = parameters.geneSequence;
         end
     end    
 
@@ -157,8 +166,14 @@ methods
         % -------------------------------------------------------------------------
         fieldsToTransfer = setdiff(properties(obj), {'sequence', 'penalties', 'penaltyNames', 'numRegions'}); 
        
-        for o=1:length(obj)
+        nGenes = length(obj)
+        nGenesChunk = 1000; 
+        fprintf('writing fasta for the %d genes in chunks of %d genes \n ',nGenes, nGenesChunk)
+
+        ir = 0;
+        for o=1:nGenes
             for i=1:obj(o).numRegions
+                ir = ir + 1;
                 localHeader = ['id=' obj(o).id ...
                     ' geneName=' obj(o).geneName ...
                     ' startPos=' num2str(obj(o).startPos(i)) ...
@@ -172,15 +187,24 @@ methods
                 for j=1:length(obj(o).penaltyNames)
                     localHeader = [localHeader ' p_' obj(o).penaltyNames{j} '=' num2str(obj(o).penalties(j,i))];
                 end
-                headers{i} = strtrim(localHeader);
+                data(ir).Sequence = obj(o).sequence{i};
+                data(ir).Header = strtrim(localHeader);
+            end
+            % -------------------------------------------------------------------------
+            % Write fasta in chunks
+            % -------------------------------------------------------------------------
+            if mod(o, nGenesChunk) == 0
+                fastawrite(filePath,data);
+                fprintf('.');
+              data = struct();
+                ir = 0;
             end
 
-            % -------------------------------------------------------------------------
-            % Write fasta 
-            % -------------------------------------------------------------------------
-            fastawrite(filePath, headers, obj(o).sequence);
         end
-        
+        if ~isempty(fieldnames(data))
+            fastawrite(filePath,data)
+        end
+        fprintf('complete!')
         % -------------------------------------------------------------------------
         % Reenable warnings 
         % -------------------------------------------------------------------------

@@ -93,6 +93,7 @@ try
 catch
     fclose(fid);
     delete(filePath);
+    assignin('base', 'bigVariable', variable);
     error('matlabFunctions:byteStreamError', 'Unable to create bytestream. It is likely that the file is too large');
 end
 
