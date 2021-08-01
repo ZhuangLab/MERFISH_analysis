@@ -6,6 +6,7 @@ classdef MERFISHDecoder < handle
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
+% jeffrey.moffitt@childrens.harvard.edu
 % September 21, 2017
 %--------------------------------------------------------------------------
 % Copyright Presidents and Fellows of Harvard College, 2018.
@@ -25,10 +26,10 @@ properties
     name                    % A string that can be used to distinguish different decoder objects
     hal_version = 'hal1';   % A string that determines the version of hal info/xml files to use for image metadata
 end
-
+ 
 properties (SetAccess=protected)
     % Version 
-    version = '0.4';        % Version number--used to identify how to load saved classes
+    version = '0.6';        % Version number--used to identify how to load saved classes
 
     % Metadata associated with raw data
     rawDataPath             % The path to the raw data
@@ -73,6 +74,9 @@ properties (SetAccess=protected)
     imageSize               % The number of pixels (HxW)
     imageExt                % Extension of the raw image data
     pixelSize               % The size of the pixel
+    
+    cameraIDs = {''}        % The ids associated with cameras for imaging
+    numCameraIDs = 1        % The number of cameras used to collect data 
 
     numImagingRounds        % The number of imaging rounds
     imageRoundIDs           % The ids of the different imaging rounds
@@ -94,6 +98,9 @@ properties (SetAccess=protected)
     affineTransforms        % All affine transformations
     residuals               % All residuals
     geoTransformReport      % The geometric transform report
+    
+    % Properties associated with sliced decoders
+    originalMaxFovID = []   % The original maximum fov id number from downsampled data
         
 end
 
@@ -300,7 +307,7 @@ methods
             placesToLook = {'', ['settings' filesep]}; % Define places to look
             for p=1:length(placesToLook) % Look for a valid codebook
                 localBasePath = [obj.rawDataPath placesToLook{p}];
-                fileStruct = dir([localBasePath '*_codebook.csv']);
+                fileStruct = dir([localBasePath '*codebook.csv']);
                 if ~isempty(fileStruct) || length(fileStruct) == 1
                     obj.codebookPath = [localBasePath fileStruct.name];
                     break; % Stop when the first codebook is found
@@ -605,6 +612,7 @@ methods
         temp = combinedList{1};
         for i=2:length(combinedList)
             temp = cat(1, temp, combinedList{i});
+            combinedList{i} = []; % Destroy the extra copy of the bList to save space
         end
         combinedList = temp;
 
@@ -762,6 +770,11 @@ methods
                 % Convert featureID to the corresponding index in the count
                 % matrix
                 featureInd = discretize([aList.feature_id], [featureIDs inf]); % The lower edge is <= the upper is <
+                
+%--------------------------------------------------------------------------
+                featureInd = uint32(featureInd);
+                barcodeID = uint32(barcodeID);
+%--------------------------------------------------------------------------
                 
                 % Compute the various quantities
                 % Exact/in feature
@@ -956,7 +969,7 @@ methods
         
         % Create figure handle
         figHandle = figure('Name', 'Found feature statistics', ...
-            'Color', 'w');
+            'Color', 'w', 'Position', [1 1 1000 500]);
         
         % Generate subplot on feature numbers
         subplot(2,3,1);
@@ -974,8 +987,10 @@ methods
         xlabel('Z Position (micron)');
         ylabel('Average number of voxels');
         title([num2str(mean(area(:)),2) '+/-' num2str(std(area(:))/sqrt(length(area(:))),2) ' (SEM)']);
-        zDiff = mean(diff(zPos));
-        xlim([min(zPos) max(zPos)] + zDiff*[-1 1]);
+        if length(zPos) > 1
+            zDiff = mean(diff(zPos));
+            xlim([min(zPos) max(zPos)] + zDiff*[-1 1]);
+        end
         
         % Plot distribution of volume
         subplot(2,3,3);
@@ -1028,8 +1043,10 @@ methods
         xlabel('Z Position (micron)');
         ylabel('Average area (microns^2)');
         title([num2str(mean(area(:)),2) '+/-' num2str(std(area(:))/sqrt(length(area(:))),2) ' (SEM)']);
-        zDiff = mean(diff(zPos));
-        xlim([min(zPos) max(zPos)] + zDiff*[-1 1]);
+        if length(zPos) > 1
+            zDiff = mean(diff(zPos));
+            xlim([min(zPos) max(zPos)] + zDiff*[-1 1]);
+        end
         
         % Plot distribution of volume
         subplot(2,3,6);
@@ -1343,10 +1360,20 @@ methods
         for f=1:obj.numFov
             % Select the first data channel image file to determine
             % location of meta data
-            fileInd = find(...
-                strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(1).imageType) & ...
-                [obj.rawDataFiles.imagingRound] == obj.dataOrganization(1).imagingRound & ...
-                [obj.rawDataFiles.fov] == obj.fovIDs(f));
+            
+            % Handle camera
+            if ~isfield(obj.dataOrganization(1), 'imagingCameraID')
+                fileInd = find(...
+                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(1).imageType) & ...
+                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(1).imagingRound & ...
+                    [obj.rawDataFiles.fov] == obj.fovIDs(f));
+            else
+                fileInd = find(...
+                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(1).imageType) & ...
+                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(1).imagingRound & ...
+                    strcmp({obj.rawDataFiles.cameraID}, obj.dataOrganization(1).imagingCameraID) & ...
+                    [obj.rawDataFiles.fov] == obj.fovIDs(f));
+            end
             
             % Check for existance
             if isempty(fileInd)
@@ -1356,13 +1383,19 @@ methods
            
             % Switch on raw data type to determine how load metadata
             switch obj.imageExt
-                case 'dax' 
+                case {'dax', 'tiff', 'tif'} 
                     
                     % Switch on the version of hal
                     switch obj.hal_version
                         case 'hal1'
-                            % Load image meta data
-                            infoFile = ReadInfoFile([obj.rawDataPath obj.rawDataFiles(fileInd).name], 'verbose', false);
+                            if ismember(obj.imageExt, {'dax'})
+                                % Load image meta data
+                                infoFile = ReadInfoFile([obj.rawDataPath obj.rawDataFiles(fileInd).name], 'verbose', false);
+                            else
+                                % THIS CASE IS RESERVED FOR FUTURE USE
+                                error('matlabFunctions:unsupportedExt', 'Tiff data are not yet for hal1 info file structure');
+                            end
+
                         case 'hal2'
                             % UNDER CONSTRUCTION: THIS NEEDS TO BE UDPDATED
                             % TO HAVE A ROBUST FUNCTION FOR LOADING THE XML
@@ -1414,9 +1447,6 @@ methods
                     if f==1
                         obj.imageSize = infoFile.frame_dimensions;
                     end
-                case {'tiff', 'tif'}
-                    % THIS CASE IS RESERVED FOR FUTURE USE
-                    error('matlabFunctions:unsupportedExt', 'Tiff data are not yet supported');
                 otherwise
                     error('matlabFunctions:unsupportedExt', 'This file extension is not supported');
             end
@@ -1447,13 +1477,14 @@ methods
 
         % Loop over all file name patterns
         foundFiles = [];
+        parseTimer = tic;
         for i=1:length(uniqueImageType)
 
             % Build file data structure
             newFiles = BuildFileStructure(obj.rawDataPath, ...
                 'fileExt', obj.imageExt, ...
-                'fieldNames', {'imageType', 'fov', 'imagingRound'}, ... % Required fields
-                'fieldConv', {@char, @str2num, @str2num}, ...
+                'fieldNames', {'imageType', 'fov', 'imagingRound', 'cameraID'}, ... % Required fields
+                'fieldConv', {@char, @str2num, @str2num, @char}, ...
                 'regExp', obj.dataOrganization(ia(i)).imageRegExp, ...
                 'requireFlag', uniqueImageType{i});
 
@@ -1461,10 +1492,16 @@ methods
             if any(arrayfun(@(x)isempty(x.imagingRound), newFiles))
                 [newFiles(:).imagingRound] = deal(-1); % Flag that no image round was specified
             end
+            
+            % Coerce empty cameraID fields
+            if any(arrayfun(@(x)isempty(x.cameraID), newFiles))
+                [newFiles(:).cameraID] = deal(''); % Flag that no image round was specified
+            end
 
             % Combine file structures
             foundFiles = [foundFiles newFiles];
         end
+        disp(['...completed parse in ' num2str(toc(parseTimer)) ' s']);
         
         % Check to see if any files were found
         if isempty(foundFiles)
@@ -1491,6 +1528,8 @@ methods
         obj.imageRoundIDs = unique([foundFiles.imagingRound]);
         obj.numFov = length(obj.fovIDs);
         obj.numImagingRounds = length(obj.imageRoundIDs);
+        obj.cameraIDs = unique({foundFiles.cameraID});
+        obj.numCameraIDs = length(obj.cameraIDs);
         
         % Allocate memory for stage positions
         obj.fovPos = nan(obj.numFov, 2); % These entries are in the same order as the fovIDs.
@@ -1509,27 +1548,38 @@ methods
         padNum2str = @(x,y)num2str(x,['%0',num2str(ceil(log10(y+1))),'d']);
         obj.fov2str = @(x)padNum2str(x, max(obj.fovIDs));
         
-        % Run a cross check
-        for f=1:length(obj.fovIDs)
-            % Loop over each data channcel for each fov
-            for c=1:obj.numDataChannels
-
-                % Try and find the file
-                fileInd = find(...
-                    strcmp({foundFiles.imageType}, obj.dataOrganization(c).imageType) & ...
-                    [foundFiles.imagingRound] == obj.dataOrganization(c).imagingRound & ...
-                    [foundFiles.fov] == obj.fovIDs(f));
-
-                % Check for consistency
-                if length(fileInd) ~= 1
-                    disp(['An error has been found with the following file!']);
-                    disp(['   FOV: ' num2str(obj.fovIDs(f))]);
-                    disp(['   imageType: ' obj.dataOrganization(c).imageType]);
-                    disp(['   imagingRound: ' obj.dataOrganization(c).imagingRound]);
-                    error('matlabFunctions:invalidFileInformation', ...
-                        'Either a file is missing or there are multiple files that match an expected pattern.');
-                end
+        %Run a cross check
+        % Loop over each data channcel for each fov
+        for c=1:obj.numDataChannels
+            % Extract local properties of the channel
+            localImageType = obj.dataOrganization(c).imageType;
+            localImagingRound = obj.dataOrganization(c).imagingRound;
+            if isfield(obj.dataOrganization(c), 'imagingCameraID') % Handle backwards compatibility or single camera systems
+                localCameraID = obj.dataOrganization(c).imagingCameraID;
+            else
+                localCameraID = '';
             end
+
+            % Extract the fovIDs for files with these parameters
+            foundFovIDs = [foundFiles(strcmp({foundFiles.imageType}, localImageType) & ...
+                [foundFiles.imagingRound] == localImagingRound & ...
+                strcmp({foundFiles.cameraID}, localCameraID)).fov];
+
+            % Find the fovIDs that are missing
+            missingFovIDs = setdiff(foundFovIDs, obj.fovIDs);
+
+            for f=1:length(missingFovIDs)
+                disp(['An error has been found with the following file!']);
+                disp(['   FOV: ' num2str(missingFovIDs)]);
+                disp(['   imageType: ' obj.dataOrganization(c).imageType]);
+                disp(['   imagingRound: ' obj.dataOrganization(c).imagingRound]);
+                disp(['   imagingCameraID: ' localCameraID]);
+                error('matlabFunctions:invalidFileInformation', ...
+                    'Either a file is missing or there are multiple files that match an expected pattern.');
+            end
+            
+            %Display Progress
+            disp(['...completed ' num2str(c) ' channel of ' num2str(obj.numDataChannels)]);
             
         end
         
@@ -1607,7 +1657,7 @@ methods
         % -------------------------------------------------------------------------
         % Run processing on individual fov in parallel (if requested)
         % -------------------------------------------------------------------------
-        %spmd (obj.numPar) % Run in parallel
+        spmd (obj.numPar) % Run in parallel
             % Loop over requested fov
             for f=labindex:numlabs:length(fovIDs)
 				% Determine local fov id
@@ -1869,7 +1919,9 @@ methods
 
                     % Link all children axes
                     allChildren = get(figHandles, 'Children');
-                    allChildren = cat(1,allChildren{:});
+                    if iscell(allChildren) % Handle the output for a array of figure handles
+                        allChildren = cat(1,allChildren{:});
+                    end
                     linkaxes(allChildren, 'xy');
                 end
 
@@ -1993,7 +2045,7 @@ methods
                     display(char(displayStrings));
                 end
              end
-        %end % SPMD loop
+        end % SPMD loop
     end
     
     % -------------------------------------------------------------------------
@@ -2800,7 +2852,7 @@ methods
         % -------------------------------------------------------------------------
         % Parse via individual fov
         % -------------------------------------------------------------------------
-        %spmd (obj.numPar)
+        spmd (obj.numPar)
             % Loop over individual fov
             for f=labindex:numlabs:length(fovIDs)
                 % Determine local fovID
@@ -2847,6 +2899,7 @@ methods
                     end
                 end
                 
+				
                 % Check for existing or corrupt barcode list
                 barcodeFilePath = [barcodeByFovPath 'fov_' obj.fov2str(localFovID) '_blist.bin'];
                 if ~exist(barcodeFilePath, 'file') 
@@ -2907,7 +2960,7 @@ methods
                         displayStrings = {};
                     end
                 end
-                
+                				
                 % Add additional fields to barcode list
                 [bList(:).feature_id] = deal(int32(-1));            % The id of the feature to which the barcode was assigned 
                 [bList(:).feature_dist] = deal(zeros(1, 'single')); % The distance to the nearest feature edge
@@ -2919,46 +2972,59 @@ methods
                 %Discretize z positions for all barcodes
                 zInds = discretize(barcodePos(:,3), [obj.zPos Inf]);
                 
-                %Loop over z indices
-                for z=1:obj.numZPos
-                    %Compile a composite list of boundaries in this z
-                    %plane
-                    combinedBoundaries = zeros(0,2);
-                    isDilatedBoundary = zeros(0,1);
-                    localFeatureIDs = zeros(0,1);
-                    for F=1:length(localFeatures)
-                        % Concatenate boundaries and dilated boundaries
-                        combinedBoundaries = cat(1, combinedBoundaries, ...
-                            localFeatures(F).abs_boundaries{z},...
-                            localFeatures(F).DilateBoundary(z, obj.pixelSize/1000*parameters.dilationSize));
+				% Handle the case that there are no barcodes or no features
+				if ~isempty(bList) & ~isempty(localFeatures)
+					%Loop over z indices
+					for z=1:obj.numZPos
+						%Compile a composite list of boundaries in this z
+						%plane
+						combinedBoundaries = zeros(0,2);
+						isDilatedBoundary = zeros(0,1);
+						localFeatureIDs = zeros(0,1);
+						for F=1:length(localFeatures)
+							% Concatenate boundaries and dilated boundaries
+							combinedBoundaries = cat(1, combinedBoundaries, ...
+								localFeatures(F).abs_boundaries{z},...
+								localFeatures(F).DilateBoundary(z, obj.pixelSize/1000*parameters.dilationSize));
+							
+							% Concatenate indices for features
+							localFeatureIDs = cat(1, localFeatureIDs, ...
+								F*ones(length(localFeatures(F).abs_boundaries{z}),1), ...
+								F*ones(length(localFeatures(F).abs_boundaries{z}),1));
+							
+							% Concatenate flags for inside or outside feature
+							isDilatedBoundary = cat(1, isDilatedBoundary, ...
+								false(length(localFeatures(F).abs_boundaries{z}),1), ...
+								true(length(localFeatures(F).abs_boundaries{z}),1));
+								
+                        end
+						
+                        %Handle the case of no boundaries in the z-plane
+                        if isempty(combinedBoundaries)
+                            continue;
+                        end
                         
-                        % Concatenate indices for features
-                        localFeatureIDs = cat(1, localFeatureIDs, ...
-                            F*ones(length(localFeatures(F).abs_boundaries{z}),1), ...
-                            F*ones(length(localFeatures(F).abs_boundaries{z}),1));
-                        
-                        % Concatenate flags for inside or outside feature
-                        isDilatedBoundary = cat(1, isDilatedBoundary, ...
-                            false(length(localFeatures(F).abs_boundaries{z}),1), ...
-                            true(length(localFeatures(F).abs_boundaries{z}),1));
-                            
-                    end
-                    
-                    %Find the barcode indices in this zPlane
-                    localBarcodeIndex = find(zInds == z);
-                    
-                    %Find the nearest neighbor point in the boundaries and
-                    %the distance
-                    [nnIDX, D] = knnsearch(combinedBoundaries, barcodePos(localBarcodeIndex,1:2));
-                    
-                    %Loop through barcodes to assign found values and
-                    %determine if they are in the appropriate features
-                    for b=1:length(localBarcodeIndex)
-                        bList(localBarcodeIndex(b)).feature_id = int32(localFeatures(localFeatureIDs(nnIDX(b))).feature_id);
-                        bList(localBarcodeIndex(b)).feature_dist = single(D(b));
-                        bList(localBarcodeIndex(b)).in_feature = uint8(~isDilatedBoundary(nnIDX(b)));
-                    end
-                end
+						%Find the barcode indices in this zPlane
+						localBarcodeIndex = find(zInds == z);
+						
+						%Find the nearest neighbor point in the boundaries and
+						%the distance
+						[nnIDX, D] = knnsearch(combinedBoundaries, barcodePos(localBarcodeIndex,1:2));
+						
+						%Loop through barcodes to assign found values and
+						%determine if they are in the appropriate features
+						for b=1:length(localBarcodeIndex)
+							bList(localBarcodeIndex(b)).feature_id = int32(localFeatures(localFeatureIDs(nnIDX(b))).feature_id);
+							bList(localBarcodeIndex(b)).feature_dist = single(D(b));
+							bList(localBarcodeIndex(b)).in_feature = uint8(~isDilatedBoundary(nnIDX(b)));
+						end
+					end
+				else
+					% Display progress
+					if obj.verbose
+						displayStrings{end+1} = ['...handling case of no features or no barcodes...'];
+					end
+				end
                                 
                 % Display progress
                 if obj.verbose
@@ -2986,7 +3052,7 @@ methods
                     display(char(displayStrings)); % Final buffer flush
                 end
             end % End loop over fov
-        %end % End spmd loops
+        end % End spmd loops
         
     end % End function
         
@@ -3045,7 +3111,7 @@ methods
         % -------------------------------------------------------------------------
         % Find spots within individual fov
         % -------------------------------------------------------------------------
-        %spmd (obj.numPar)
+        spmd (obj.numPar)
             % Loop over individual fov
             for f=labindex:numlabs:length(fovIDs)
                 % Determine local fovID
@@ -3285,7 +3351,7 @@ methods
                     display(char(displayStrings)); % Final buffer flush
                 end
             end % End loop over fov
-        %end % End spmd loops
+        end % End spmd loops
         
     end % End function
     
@@ -3802,7 +3868,7 @@ methods
                         else % Skip analysis file exists
                             if obj.verbose
                                 displayStrings{end+1} = ['File appears to be complete. Skipping analysis.'];
-                                display(char(displayStrings)); % Display the strings before exit
+                                disp(char(displayStrings)); % Display the strings before exit
                             end
                             continue;
                         end
@@ -3829,10 +3895,19 @@ methods
                             end
                             
                             % Find fiducial information
-                            fileInd = find(...
-                                strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
-                                [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ...
-                                [obj.rawDataFiles.fov] == localFovID);
+                            if isfield(obj.dataOrganization(c), 'fiducialCameraID')
+                                fileInd = find(...
+                                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
+                                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ... 
+                                    strcmp({obj.rawDataFiles.cameraID}, obj.dataOrganization(c).fiducialCameraID) & ...
+                                    [obj.rawDataFiles.fov] == localFovID);
+
+                            else
+                                fileInd = find(...
+                                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
+                                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ...
+                                    [obj.rawDataFiles.fov] == localFovID);
+                            end
 
                             % Check for consistency
                             if length(fileInd) ~= 1
@@ -3840,6 +3915,9 @@ methods
                                 disp(c);
                                 disp(obj.dataOrganization(c).fiducialImageType);
                                 disp(obj.dataOrganization(c).fiducialImagingRound);
+                                if isfield(obj.dataOrganization(c), 'fiducialCameraID')
+                                    disp(obj.dataOrganization(c).fiducialCameraID);
+                                end
                                 disp(localFovID);
                                 error('matlabFunctions:invalidFileInformation', ...
                                     'Either a file is missing or there are multiple files that match an expected pattern.');
@@ -3892,10 +3970,18 @@ methods
                             end
                             
                             % Identify name of mList
-                            fileInd = ...
-                                strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
-                                [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ...
-                                [obj.rawDataFiles.fov] == localFovID;
+                            if isfield(obj.dataOrganization(c), 'fiducialCameraID')
+                                fileInd = ...
+                                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
+                                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ...
+                                    strcmp({obj.rawDataFiles.cameraID}, obj.dataOrganization(c).fiducialCameraID) & ...
+                                    [obj.rawDataFiles.fov] == localFovID;
+                            else
+                                fileInd = ...
+                                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
+                                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ...
+                                    [obj.rawDataFiles.fov] == localFovID;
+                            end
 
                             % Determine file name
                             localFileName = obj.rawDataFiles(fileInd).name;
@@ -3926,13 +4012,23 @@ methods
                             [localAffine(c), ~, localResiduals{c}] = MLists2Transform(refList, movList, ...
                                 'ignoreFrames', true, ...
                                 'controlPointMethod', 'kNNDistanceHistogram', ...
-                                'histogramEdges', obj.parameters.warp.controlPointOffsetRange);
+                                'histogramEdges', obj.parameters.warp.controlPointOffsetRange, ...
+                                'numNN', obj.parameters.warp.numNN, ...
+                                'pairDistTolerance', obj.parameters.warp.pairDistanceTolerance);
                             
+                            % Generate additional input
+                            if obj.verbose
+                                displayStrings{end+1} = ['...completed affine transform for data channel ' num2str(c)];
+                                displayStrings{end+1} = ['...out of ' num2str(length(refList.x)) ' reference molecules and ' num2str(length(movList.x)) ' moving molecules matched ' num2str(size(localResiduals{c},1))];
+                            end
                         end % End construction of affine transformations
 
                         % Create display strings
                         if obj.verbose
                             displayStrings{end+1} = ['... completed in ' num2str(toc(localTimer)) ' s'];
+                            disp(char(displayStrings)); % Display the strings
+                            displayStrings = {};
+
                         end
                         
                         % Save data associated with transform for this fov
@@ -3946,13 +4042,145 @@ methods
                             'The provided fiducial fit method is not supported');
                     
                 end % End switch statement on fiducial fitting/affine transformation construction approach
-                
+               
                 % Create display strings
                 if obj.verbose
                     displayStrings{end+1} = PageBreak('nodisplay');
                     localTimer = tic; % Restart timer
                     displayStrings{end+1} = ['Writing warped tiff file'];
                 end
+                
+                
+                % Export a warped tiff stack of fiducials only: Run this
+                % first as a complete warped tiff stack is the measure of a
+                % complete warp process. 
+                if obj.parameters.warp.exportWarpedBeads
+                    
+                    if obj.verbose
+                        displayStrings{end+1} = ['Creating warped fidicual stack...'];
+                    end
+                    
+                    % Define the folder for defaults if it does not exist
+                    fiducialsPath = [obj.normalizedDataPath obj.warpedDataPath filesep 'warped_fiducials' filesep];
+                    if ~exist(fiducialsPath, 'dir')
+                        mkdir(fiducialsPath);
+                    end
+                    
+                    % Define the bead tiff file name
+                    fiducialsTiffFileName = [fiducialsPath 'fov_' obj.fov2str(localFovID) '.tif'];
+                    
+                    % Overwrite any previous analysis
+                    if exist(fiducialsTiffFileName, 'dir')
+                        if obj.verbose
+                            displayStrings{end+1} = ['...found existing warped fidicual stack.... removing...'];
+                        end
+                        delete(fiducialsTiffFileName);
+                    end
+
+                    
+                    % Create tiff file
+                    fiducialsTiffFile = Tiff(fiducialsTiffFileName, 'w8');
+
+                    % Create tiff tags
+                    fiducialsTiffTagStruct.ImageLength = obj.imageSize(1);
+                    fiducialsTiffTagStruct.ImageWidth = obj.imageSize(2);
+                    fiducialsTiffTagStruct.Photometric = Tiff.Photometric.MinIsBlack;
+                    fiducialsTiffTagStruct.BitsPerSample = 16;
+                    fiducialsTiffTagStruct.SamplesPerPixel = 1;
+                    fiducialsTiffTagStruct.RowsPerStrip = 16;
+                    fiducialsTiffTagStruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+                    fiducialsTiffTagStruct.Software = 'MATLAB';
+                    fiducialsTiffTagStruct.ImageDescription = sprintf(['ImageJ=1.47a\n' ...      % ImageJ label
+                        'images=' num2str(obj.numDataChannels) '\n' ...     % The total number of images
+                        'channels=1\n' ...                                              % The number of channels, 1 for now
+                        'slices=1\n' ...                         % The number of z slices
+                        'frames=' num2str(obj.numDataChannels) '\n' ...                     % The number of frames, i.e. data org entries
+                        'hyperstack=true\n' ...
+                        'loop=false\n' ...
+                        ]);                
+                    
+                    % Loop over all data channels
+                    try
+                        for c=1:obj.numDataChannels
+                            % Skip fiducial fitting if no fiducial round is
+                            % provided
+                            if ~isfield(obj.dataOrganization(c), 'fiducialImageType')
+                                displayStrings{end+1} = ['...no fiducials for channel ' num2str(c)];
+                                continue;
+                            end
+                            
+                            % Find fiducial information
+                            if isfield(obj.dataOrganization(c), 'fiducialCameraID')
+                                fileInd = find(...
+                                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
+                                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ... 
+                                    strcmp({obj.rawDataFiles.cameraID}, obj.dataOrganization(c).fiducialCameraID) & ...
+                                    [obj.rawDataFiles.fov] == localFovID);
+
+                            else
+                                fileInd = find(...
+                                    strcmp({obj.rawDataFiles.imageType}, obj.dataOrganization(c).fiducialImageType) & ...
+                                    [obj.rawDataFiles.imagingRound] == obj.dataOrganization(c).fiducialImagingRound & ...
+                                    [obj.rawDataFiles.fov] == localFovID);
+                            end
+
+                            % Determine file name
+                            localFileName = obj.rawDataFiles(fileInd).name;
+                            
+                            % Switch based on the imageExt to load fiducial
+                            % image
+                            localImage = [];
+                            switch obj.imageExt
+                                case 'dax'
+                                    % Read single data frame
+                                    localImage = ReadDax([obj.rawDataPath localFileName], ...
+                                        'startFrame', obj.dataOrganization(c).fiducialFrame, ...
+                                        'endFrame', obj.dataOrganization(c).fiducialFrame, ...
+                                        'verbose', false);
+                                case {'tiff','tif'}
+                                    % Read tiff frame
+                                    localImage = imread([obj.rawDataPath localFileName], ...
+                                        obj.dataOrganization(c).fiducialFrame);
+                                otherwise
+                                    error('matlabFunctions:unsupportedFile', 'The specified image file ext is not yet supported.');
+                            end
+                            
+                            % Check for image load problems
+                            if isempty(localImage)
+                                error('matlabFunctions:invalidData', 'The requested frame does not exist');
+                            end
+
+                            % Warp the image
+                            ra = imref2d(size(localImage)); % Create a crop
+                            localImage = imwarp(localImage, localAffine(c), 'OutputView', ra);
+
+                            % Write tiff file
+                            fiducialsTiffFile.setTag(fiducialsTiffTagStruct);
+                            fiducialsTiffFile.write(localImage);
+                            if c~= obj.numDataChannels
+                                fiducialsTiffFile.writeDirectory(); % Write the directory for the next frame
+                            end
+                            
+                            if obj.verbose
+                                displayStrings{end+1} = ['...completed channel ' num2str(c) ' of ' num2str(obj.numDataChannels)];
+                            end
+                        end % end loop over channels
+                    catch ME
+                        % Close tiff file and delete existing file
+                        fiducialsTiffFile.close();
+                        delete(fiducialsTiffFileName);
+
+                        % Update log
+                        displayStrings{end+1} = ['Encountered error: ' ME.identifier];
+                        disp(char(displayStrings));
+
+                        % Rethrow err
+                        rethrow(ME);
+                    end
+                    if obj.verbose
+                        displayStrings{end+1} = ['...completed warped fiducial stack'];
+                    end
+                end % End if statement for creating a warped fiducial stack
                 
                 % Create tiff file
                 tiffFile = Tiff(tiffFileName, 'w8');
@@ -3974,7 +4202,11 @@ methods
                     'hyperstack=true\n' ...
                     'loop=false\n' ...
                     ]);
-
+                
+                if obj.verbose
+                    displayStrings{end+1} = ['Creating the warped tiff stack...'];
+                end
+                
                 % Gracefully handle external kill commands
                 try
                     % Load, warp, and write tiff files
@@ -3985,12 +4217,29 @@ methods
                         color = obj.dataOrganization(c).color;
                         frames = obj.dataOrganization(c).frame;
                         localZPos = obj.dataOrganization(c).zPos;
+                        if ~isfield(obj.dataOrganization(c), 'imagingCameraID')
+                            localCameraID = '';
+                        else
+                            localCameraID = obj.dataOrganization(c).imagingCameraID;
+                        end
 
                         % Identify dax file
                         localFile = obj.rawDataFiles([strcmp({obj.rawDataFiles.imageType}, imageType) & ...
                             [obj.rawDataFiles.fov] == localFovID & ...
+                            strcmp({obj.rawDataFiles.cameraID}, localCameraID) & ...
                             [obj.rawDataFiles.imagingRound] == imagingRound]);
 
+                        % Identify the affine transform to be used to adjust this color channel
+                        localIDs = find(strcmp({obj.parameters.warp.colorTransforms.color}, ....
+                            num2str(obj.dataOrganization(c).color))); % Find all transforms that match the specified color (they will be applied in order)
+                        
+                        % Extract this transform
+                        if ~isempty(localIDs)
+                            localTransforms = obj.parameters.warp.colorTransforms(localIDs);
+                        else
+                            localTransforms = [];
+                        end
+                        
                         % Loop over z and load dax
                         for z=1:length(obj.zPos)
                             % Find frame
@@ -4009,20 +4258,79 @@ methods
                                     % Read single data frame
                                     localImage = ReadDax(localFile.filePath, 'startFrame', frames(frameInd), ...
                                         'endFrame', frames(frameInd), 'verbose', false);
-
-                                    % Warp dax as frames are loaded
-                                    ra = imref2d(size(localImage));
-                                    localImage = imwarp(localImage, localAffine(c), 'OutputView', ra);
-
+                                case {'tiff','tif'}
+                                    % Read tiff frame
+                                    localImage = imread(localFile.filePath, frames(frameInd));
                                 otherwise
                                     error('matlabFunctions:unsupportedFile', 'The specified image file ext is not yet supported.');
                             end
-
+                            
+                            % Check for image load problems
+                            if isempty(localImage)
+                                error('matlabFunctions:invalidData', 'The requested frame does not exist');
+                            end
+                            
+                            % Apply a color based transform if needed
+                            ra = imref2d(size(localImage)); % Create a crop
+                            if ~isempty(localTransforms)
+                                % Loop over chromatic transforms and apply
+                                % in order
+                                for T=1:length(localTransforms)
+                                    switch localTransforms(T).type
+                                        case {'similarity', 'Similarity', 'Euclidean', 'euclidean'}
+                                            % Create the affine transform based
+                                            % on the provided data
+                                            trans = affine2d(localTransforms(T).transform);
+                                            % Apply the transform
+                                            localImage = imwarp(localImage, trans, 'OutputView', ra);
+                                            
+                                        case {'Invert', 'invert'}
+                                            % Invert the axes of the image
+                                            % as needed
+                                            % Flip x axis
+                                            if localTransforms(T).transform(1)
+                                                localImage = localImage(:, end:-1:1);
+                                            end
+                                            % Flip y axis
+                                            if localTransforms(T).transform(2)
+                                                localImage = localImage(end:-1:1, :);
+                                            end
+                                            
+                                        otherwise
+                                            error('matlabFunctions:unsupportedFile', 'The transform type provided is not supported');
+                                    end
+                                end
+                            end
+                            
+                            % Remove translation of the image due to stage
+                            % alignment using the fiducial bead affine
+                            % transform
+                            localImage = imwarp(localImage, localAffine(c), 'OutputView', ra);
+                            
+                            % Reorient image to a fixed orientation
+                            % Image width represents X,
+                            % Image height represents Y, 
+                            % X/Y increase with increasing pixel id
+                            cameraOrientation = obj.parameters.warp.cameraOrientation;
+                            if cameraOrientation(3)
+                                localImage = transpose(localImage); % Exchange X/Y
+                            end
+                            if cameraOrientation(1)
+                                localImage = flip(localImage, 2); % Invert the X axis (rows)
+                            end
+                            if cameraOrientation(2)
+                                localImage = flip(localImage, 1); % Invert the Y axis (columns)
+                            end
+                            
                             % Write tiff file
                             tiffFile.setTag(tiffTagStruct);
                             tiffFile.write(localImage);
                             if z~=length(obj.zPos) || c~= obj.numDataChannels
                                 tiffFile.writeDirectory(); % Write the directory for the next frame
+                            end
+                            
+                            if obj.verbose
+                                displayStrings{end+1} = ['...completed channel ' num2str(c) ' of ' num2str(obj.numDataChannels)];
                             end
 
                         end % End loop over z
@@ -4062,9 +4370,9 @@ methods
     % -------------------------------------------------------------------------
     function PreprocessFOV(obj, fovIDs)
         % Preprocess individual FOV and produce a processed tiff stack
-        % PreprocessFOV([]); % Warp all fov
-        % PreprocessFOV(fovIDs); % Warp the fov that match the specified fovids
-                
+        % PreprocessFOV([]); % Deconvolve all fov
+        % PreprocessFOV(fovIDs); % Deconvolve the fov that match the specified fovids
+        
         % -------------------------------------------------------------------------
         % Determine properties of the requested fov ids
         % -------------------------------------------------------------------------
@@ -4078,12 +4386,12 @@ methods
         % Check to see if the pixel histogram field has already been
         % populated--no need to repeat analysis if it does
         % -------------------------------------------------------------------------
-        if isempty(obj.pixelHistograms)
+        if isempty(obj.pixelHistograms) || obj.overwrite
             % -------------------------------------------------------------------------
             % Make directories if they do not exist
             % -------------------------------------------------------------------------
             % Directory for molecule lists
-            if ~exist([obj.normalizedDataPath obj.processedDataPath], 'dir');
+            if ~exist([obj.normalizedDataPath obj.processedDataPath], 'dir')
                 mkdir([obj.normalizedDataPath obj.processedDataPath]);
             end
 
@@ -4173,50 +4481,114 @@ methods
 
                     % Gracefully handle interrupts
                     try
-                        % Loop over imaging round
-                        for b=1:obj.numBits
-                            % Loop over z
-                            for z=1:obj.numZPos
-                                % Set directory and load
-                                tiffToRead.setDirectory((b-1)*obj.numZPos + z);
-                                localFrame = uint16(tiffToRead.read());
+                        % Switch to run the specific algorithm
+                        switch obj.parameters.preprocess.preprocessingMethod
 
-                                switch obj.parameters.preprocess.preprocessingMethod
-                                    case 'highPassDecon'
+                            case 'highPassDecon'
+                                % Loop over imaging round
+                                for b=1:obj.numBits
+                                    % Loop over z
+                                    for z=1:obj.numZPos
+                                        % Set directory and load
+                                        tiffToRead.setDirectory((b-1)*obj.numZPos + z);
+                                        localFrame = uint16(tiffToRead.read());
+
                                         % High pass filter (and threshold on zero values b/c uint16)
                                         localFrame1 = uint16(localFrame) - ...
                                             uint16(imgaussfilt(localFrame, obj.parameters.preprocess.highPassKernelSize));
 
                                         % Deconvolve
-                                        localFrame2 = deconvlucy(localFrame1, ...
-                                            obj.parameters.preprocess.deconKernel, ...
-                                            obj.parameters.preprocess.numIter);
+                                        if obj.parameters.preprocess.numIterDecon > 0
+                                            localFrame2 = deconvlucy(localFrame1, ...
+                                                obj.parameters.preprocess.deconKernel, ...
+                                                obj.parameters.preprocess.numIterDecon);
+                                        else
+                                            localFrame2 = localFrame1;
+                                        end
+                                        
+                                        % Write frame
+                                        tiffToWrite.setTag(tiffTagStruct);
+                                        tiffToWrite.write(localFrame2);
 
-                                    case 'highPassErosion'
+                                        % Write directory for next frame (unless it is the last
+                                        % one)
+                                        if ((b-1)*obj.numZPos + z) ~= obj.numBits*obj.numZPos
+                                            tiffToWrite.writeDirectory();
+                                        end
+
+                                        % Accumulate pixel histograms
+                                        pixelHistogram(b,:) = pixelHistogram(b,:) + hist(localFrame2(:), 0:double(uint16(inf)-1));
+                                    end 
+                                end
+
+                            case 'highPassErosion'
+                                % Loop over imaging round
+                                for b=1:obj.numBits
+                                    % Loop over z
+                                    for z=1:obj.numZPos
+                                        % Set directory and load
+                                        tiffToRead.setDirectory((b-1)*obj.numZPos + z);
+                                        localFrame = uint16(tiffToRead.read());
+
                                         % High pass filter (and threshold on zero values b/c uint16)
                                         localFrame1 = uint16(localFrame) - ...
                                             uint16(imgaussfilt(localFrame, obj.parameters.preprocess.highPassKernelSize));
 
                                         % Erode
                                         localFrame2 = imerode(localFrame1, obj.parameters.preprocess.erosionElement);
-                                    otherwise
-                                        error('matlabFunctions:invalidArguments', 'Invalid preprocessing method');
+
+                                        % Write frame
+                                        tiffToWrite.setTag(tiffTagStruct);
+                                        tiffToWrite.write(localFrame2);
+                                        
+                                        % Write directory for next frame (unless it is the last
+                                        % one)
+                                        if ((b-1)*obj.numZPos + z) ~= obj.numBits*obj.numZPos
+                                            tiffToWrite.writeDirectory();
+                                        end
+
+                                        % Accumulate pixel histograms
+                                        pixelHistogram(b,:) = pixelHistogram(b,:) + hist(localFrame2(:), 0:double(uint16(inf)-1));
+                                    end 
                                 end
 
-                                % Write frame
-                                tiffToWrite.setTag(tiffTagStruct);
-                                tiffToWrite.write(localFrame2);
-                                % Write directory for next frame (unless it is the last
-                                % one)
-                                if ((b-1)*obj.numZPos + z) ~= obj.numBits*obj.numZPos
-                                    tiffToWrite.writeDirectory();
+                            case 'highPassDeconWB'
+                                % Loop over imaging round
+                                for b=1:obj.numBits
+                                    % Loop over z
+                                    for z=1:obj.numZPos
+                                        % Set directory and load
+                                        tiffToRead.setDirectory((b-1)*obj.numZPos + z);
+                                        localFrame = uint16(tiffToRead.read());
+
+                                        % High pass filter (and threshold on zero values b/c uint16)
+                                        localFrame1 = uint16(localFrame) - ...
+                                            uint16(imgaussfilt(localFrame, obj.parameters.preprocess.highPassKernelSize));
+
+                                        % Deconvolve
+                                        localFrame2 = WBDeconvolution(localFrame1, ...
+                                            obj.parameters.preprocess.deconKernel, ...
+                                            obj.parameters.preprocess.numIterDecon);
+
+                                        % Write frame
+                                        tiffToWrite.setTag(tiffTagStruct);
+                                        tiffToWrite.write(localFrame2);
+                                        
+                                        % Write directory for next frame (unless it is the last
+                                        % one)
+                                        if ((b-1)*obj.numZPos + z) ~= obj.numBits*obj.numZPos
+                                            tiffToWrite.writeDirectory();
+                                        end
+
+                                        % Accumulate pixel histograms
+                                        pixelHistogram(b,:) = pixelHistogram(b,:) + hist(localFrame2(:), 0:double(uint16(inf)-1));
+                                    end 
                                 end
 
-                                % Accumulate pixel histograms
-                                pixelHistogram(b,:) = pixelHistogram(b,:) + hist(localFrame2(:), 0:double(uint16(inf)-1));
-
-                            end 
+                            otherwise
+                                error('matlabFunctions:invalidArguments', 'Invalid preprocessing method');
                         end
+
                     catch ME
                         % Close tiff file and delete partially constructed file
                         tiffToWrite.close();
@@ -4246,7 +4618,7 @@ methods
                     end
 
                 end
-            end
+            end % spmd loop
         else
             warning('The pixel histograms field is not empty, indicating that preprocessing is complete on this data set.');
         end
@@ -4438,24 +4810,26 @@ methods
                 case {'mosaic', 'l'}
                     % Determine the number of slices
                     numSlices = length(obj.sliceIDs);
-                    isSlicePresent = true(1, numSlices);
-                    
+                    isSlicePresent = false(1, numSlices);
+					
                     % Check for each tiff stack
                     for s=1:numSlices
-                        % First confirm that the fovIDs for each possible
-                        % slice are present in the dataset
-                        if ~isempty(setdiff(obj.sliceIDs{s}, obj.fovIDs))
-                            continue;
-                        end
-                        
-                        % If the ids are present, then has the tif been
+						% If the ids are present, then has the tif been
                         % made?
                         isSlicePresent(s) = exist([obj.normalizedDataPath obj.mosaicPath 'slice_' num2str(s) '.tif'], 'file');
+
+						% If the slice is not present check if the fovs are actually present (if not, then the slice was meant to be skipped)
+						if ~isSlicePresent(s) & s>1
+							if ~isempty(setdiff(obj.sliceIDs{s}, obj.fovIDs))
+								isSlicePresent(s) = true;
+							end
+						end
+                        
                     end
                     
                     % Return the status
                     complete(f) = all(isSlicePresent);
-                    
+					
                 otherwise
                     error('matlabFunctions:invalidArguments', 'The requested analysis type does not exist.');
             end
@@ -4696,7 +5070,7 @@ methods
         % -------------------------------------------------------------------------
         % Initialize scale factors and other quantities to report
         % -------------------------------------------------------------------------
-        numIter = obj.parameters.optimization.numIter;
+        numIter = obj.parameters.optimization.numIterOpt;
         localScaleFactors = zeros(numIter, obj.numBits);
         localScaleFactors(1,:) = obj.initScaleFactors;                        
         onBitIntensity = zeros(numIter-1, obj.numBits);
@@ -4705,7 +5079,7 @@ methods
         % -------------------------------------------------------------------------
         % Iterate
         % -------------------------------------------------------------------------
-        for i=1:obj.parameters.optimization.numIter
+        for i=1:numIter
             % Display progress
             if obj.verbose
                 PageBreak();
@@ -4927,8 +5301,10 @@ methods
                 
                 % Erase if overwrite
                 if obj.overwrite
-                    delete(barcodeFile);
-                    if obj.verbose; displayStrings{end+1} = ['Overwriting...']; end; 
+                    if exist(barcodeFile, 'file')
+                        delete(barcodeFile);
+                        if obj.verbose; displayStrings{end+1} = ['Overwriting...']; end 
+                    end
                 end
                 
                 % Check if corrupt and erase if it is
@@ -4973,7 +5349,9 @@ methods
                 if obj.verbose
                     displayStrings{end+1} = ['... completed in ' num2str(toc(localTimer)) ' s'];
                     displayStrings{end+1} = ['Starting decoding'];
+                    displayStrings{end+1} = ['... starting barcode assignment'];
                     localTimer = tic;
+                    assignmentTimer = tic;
                 end
                 
                 % Decode data
@@ -4986,8 +5364,23 @@ methods
                 % Set low intensity barcodes to zero
                 decodedImage(localMagnitude < obj.parameters.decoding.minBrightness) = 0;
                 
+                % Create display strings
+                if obj.verbose
+                    displayStrings{end+1} = ['... ... completed assignment in ' num2str(toc(assignmentTimer)) ' s'];
+                    displayStrings{end+1} = ['... saving decoded image'];
+                    saveTimer = tic;
+                end
+                
                 % Save the decoded image and the magnitude image
                 obj.SaveDecodedImageAndMagnitudeImage(decodedImage, reshape(localMagnitude, size(decodedImage)), localFovID);
+                
+                % Create display strings
+                if obj.verbose
+                    displayStrings{end+1} = ['... ... completed save in ' num2str(toc(saveTimer)) ' s'];
+                    displayStrings{end+1} = ['... starting metadata assembly'];
+                    metadataTimer = tic;
+                end
+
                 
                 % Clear measured barcodes
                 measuredBarcodes = [];
@@ -5010,6 +5403,7 @@ methods
                 
                 % Create display strings
                 if obj.verbose
+                    displayStrings{end+1} = ['... ... completed metadata assembly in ' num2str(toc(metadataTimer)) ' s'];
                     displayStrings{end+1} = ['... completed decoding in ' num2str(toc(localTimer)) ' s'];
                     displayStrings{end+1} = ['... saving ' num2str(length(measuredBarcodes)) ' barcodes'];
                     localTimer = tic;
@@ -5244,8 +5638,7 @@ methods
 
         % Close tiff
         tiffToRead.close();
-    end
-    
+    end    
     % -------------------------------------------------------------------------
     % Initialize scale factors
     % -------------------------------------------------------------------------
@@ -5267,6 +5660,17 @@ methods
                 'fileExt', 'matb', ...
                 'fieldNames', {'fov'}, ...
                 'fieldConv', {@str2num});
+            fileType = 'matb';
+            
+            % Allow for csv files (and different naming convention)
+            if isempty(foundFiles)
+                foundFiles = BuildFileStructure([obj.normalizedDataPath obj.processedDataPath 'pixel_histograms' filesep], ...
+                    'regExp', 'fov_(?<fov>[0-9]+)', ...
+                    'fileExt', 'csv', ...
+                    'fieldNames', {'fov'}, ...
+                    'fieldConv', {@str2num});
+                fileType = 'csv';
+            end
 
             % Display progress
             if obj.verbose
@@ -5281,13 +5685,20 @@ methods
             end
 
             % Initialize and allocate memory
-            obj.pixelHistograms =  zeros(obj.numBits, uint16(inf)); % Allocate memory and initialize to zero
+            pixelHistograms =  zeros(obj.numBits, uint16(inf)); % Allocate memory and initialize to zero
 
             % Loop over all fov ids
             for f=1:obj.numFov
                 localFovID = obj.fovIDs(f);
-                localData = LoadByteStream(foundFiles([foundFiles.fov] == localFovID).filePath, 'verbose', false);
-                obj.pixelHistograms = obj.pixelHistograms + localData; % Combine pixel histogram
+                switch fileType
+                    case 'matb'
+                        localData = LoadByteStream(foundFiles([foundFiles.fov] == localFovID).filePath, 'verbose', false);
+                    case 'csv'
+                        localData = csvread(foundFiles([foundFiles.fov] == localFovID).filePath);
+                    otherwise
+                        error('matlabFunctions:invalidArguments', 'Unrecognized file extension requested for pixel histograms');
+                end
+                pixelHistograms = pixelHistograms + localData; % Combine pixel histogram
             end
             
             % Save pixel histograms
@@ -5307,6 +5718,9 @@ methods
             if obj.verbose
                 display(['...completed in ' num2str(toc(localTimer)) ' s']);
             end
+            
+            % Update pixel histograms in decoder
+            obj.pixelHistograms = pixelHistograms;
         end
         
         % Create report path for saving the initial scale factor selection
@@ -5354,6 +5768,15 @@ methods
         SaveFigure(figHandle, 'parameters', obj.parameters.display, ...
             'savePath', [obj.normalizedDataPath obj.reportPath]);
         close(figHandle);
+        
+        % Normalize the scale factors to 1 to facilitate real brightness
+        % measures
+        if obj.parameters.optimization.normalizeToOne
+            if obj.verbose
+                disp('Normalizing scale factors to 1');
+            end
+            initScaleFactors = initScaleFactors/mean(initScaleFactors);
+        end
         
         % Record the initial scale factors
         obj.initScaleFactors = initScaleFactors;
@@ -5687,6 +6110,10 @@ methods
         % Cut the nubmer of data channels
         obj.numDataChannels = length(obj.dataOrganization);
         
+        % Save the original largest fovID for the purposes of matching the
+        % pad in fov strings
+        obj.originalMaxFovID = max(obj.fovIDs);
+        
         % Cut the fov
         obj.fovIDs = obj.fovIDs(shouldKeepFOV);
         obj.fovPos = obj.fovPos(shouldKeepFOV,:);
@@ -5701,8 +6128,9 @@ methods
         obj.geoTransformReport = [];
         obj.pixelHistograms = [];
         obj.initScaleFactors = [];
+        
     end
-
+   
 end
 % -------------------------------------------------------------------------
 % Static methods
@@ -5720,7 +6148,7 @@ methods (Static)
         if dirPath(end) ~= filesep
             dirPath(end+1) = filesep;
         end
-        if ~isdir(dirPath)
+        if ~isfolder(dirPath)
             error('matlabFunctions:invalidArguments', 'The provided path is not valid');
         end
         
@@ -5752,6 +6180,12 @@ methods (Static)
         end
         
         % -------------------------------------------------------------------------
+        % Check to see if valid -- all previous versions have verbose field
+        % -------------------------------------------------------------------------
+        if ~exist([dirPath obj.mDecoderPath 'verbose.matb'])
+            error('The mDecoder appears to be corrupt!');
+        end
+        % -------------------------------------------------------------------------
         % Load the version number
         % -------------------------------------------------------------------------
         try
@@ -5759,11 +6193,12 @@ methods (Static)
         catch % Handle the case that the saved version is not in matb format or is non-existent
             version = '0.1';
         end
+        
         % -------------------------------------------------------------------------
         % Load properties/data
         % -------------------------------------------------------------------------
         switch version
-            case {'0.1', '0.2', '0.3','0.4'}
+            case {'0.1', '0.2', '0.3','0.4', '0.5', '0.6'}
                 for i=1:length(fieldsToLoad)
                     switch fieldsToLoad{i}
                         case '' % Reserved for future use
@@ -5785,6 +6220,7 @@ methods (Static)
             display(['FOV: ' num2str(obj.numFov)]);
             display(['Bits: ' num2str(obj.numBits)]);
             display(['Data channels: ' num2str(obj.numDataChannels)]);
+            display(['Number of cameras: ' num2str(obj.numCameraIDs)]);
             display(['Loaded in ' num2str(toc(loadTimer)) ' s']);
         end
         
@@ -5819,13 +6255,25 @@ methods (Static)
                 end
             end     
         end
-
+        % -------------------------------------------------------------------------
+        % Handle up-conversion of rawDataFiles
+        % -------------------------------------------------------------------------
+        if ~isempty(obj.rawDataFiles) && ~isfield(obj.rawDataFiles(1), 'cameraID')
+            disp(['Adding a cameraID field to rawDataFiles to maintain version compatibility']);
+            for F=1:length(obj.rawDataFiles)
+                obj.rawDataFiles(F).cameraID = '';
+            end
+        end
+        
         % -------------------------------------------------------------------------
         % Handle updated parameters fields (important for some version up-conversions)
         % -------------------------------------------------------------------------
         padNum2str = @(x,y)num2str(x,['%0',num2str(ceil(log10(y+1))),'d']);
-        obj.fov2str = @(x)padNum2str(x, max(obj.fovIDs));
-        
+        if ~isempty(obj.originalMaxFovID)
+            obj.fov2str = @(x)padNum2str(x, obj.originalMaxFovID);
+        else
+            obj.fov2str = @(x)padNum2str(x, max(obj.fovIDs));
+        end
         % -------------------------------------------------------------------------
         % Handle the location of the mDecoder (the normalizedDataPath is
         % the load path)
@@ -5847,14 +6295,24 @@ methods (Static)
             {'daoSTORM'}, ...
             'daoSTORM'};
         defaults(end+1,:) = {'controlPointOffsetRange', ...
-            'array', [-30:.5:30]};                              % The histogram properties for determining crude offset
+            'array', [-60:.5:60]};                              % The histogram properties for determining crude offset
+        defaults(end+1,:) = {'numNN', 'positive', 10};          % The number of nearest neighbors to include in the search
+        defaults(end+1,:) = {'pairDistanceTolerance', 'positive', 3}; % The multiple of the histogram distance used to judge paired beads
         defaults(end+1,:) = {'pixelSize', 'positive', 109};     % Pixel size in nm/pixel
         defaults(end+1,:) = {'sigmaInit', 'positive', 1.6};     % Initial guess for PSF size for fiducial images
         defaults(end+1,:) = {'daoThreshold', 'positive', 500};  % The minimum brightness for fitting fiducials
         defaults(end+1,:) = {'daoBaseline', 'positive', 100};   % The assumed baseline of the camera
         
+        defaults(end+1,:) = {'exportWarpedBeads', 'boolean', true}; % Export a warped set of bead images
+        
+        defaults(end+1,:) = {'cameraOrientation', 'array', ...  % Set the orientation of the camera to the stage:
+            [0 0 0]};                                           % The first/second element invert X/Y if '1'; the third element transposes X/Y
+        
         defaults(end+1,:) = {'geoTransformEdges', 'cell', ...   % The histogram bins for position calculating position dependent bias in warping
             {0:25:2048, 0:25:2048}}; 
+        
+        defaults(end+1,:) = {'colorTransforms', 'struct', ...   % A structure array that includes affine transforms for all color channels. 
+            struct('color', '', 'transform', [], 'type', '')};  % The color entries must match those provided in the data organization file
         
     end
     
@@ -5868,7 +6326,8 @@ methods (Static)
         defaults = cell(0,3);
         % Select the preprocessing method
         defaults(end+1,:) = {'preprocessingMethod', ...         % The method for preprocessing
-            {'highPassDecon', 'highPassErosion'}, ...
+            {'highPassDecon', 'highPassErosion', ...
+            'highPassDeconWB'}, ...
             'highPassDecon'};
         
         % Parameters for high pass
@@ -5878,7 +6337,11 @@ methods (Static)
         % Parameters for deconvolution
         defaults(end+1,:) = {'deconKernel', ...                 % The kernel to use for Lucy Richardson Deconvolution (no decon applied if empty)
             'array', fspecial('gaussian', 10, 2)};
-        defaults(end+1,:) = {'numIter', 'nonegative', 20};
+        defaults(end+1,:) = {'numIterDecon', 'nonnegative', 20};
+        
+        % Parameters for GPU deconvolution: DEPRECATED FOR NOW                      
+%         defaults(end+1,:) = {'deconGPUsigma', 'nonnegative', 2};  % The sigma for the Lucy Richardson kernel for the GPU decon
+%         defaults(end+1,:) = {'deconGPUkernel', 'nonnegative', 10}; % The kernel size for the Lucy Richardson kernel for the GPU decon
         
         % Parameters for erosion
         defaults(end+1,:) = {'erosionElement', ...              % The morphological structuring element used for image erosion 
@@ -6041,8 +6504,8 @@ methods (Static)
             'nonnegative', 4};
         defaults(end+1,:) = {'optNumFov', ...                   % The number of fov to use in the optimization process
             'positive', 50};
-        defaults(end+1,:) = {'numIter', 'nonnegative', 10};     % The number of iterations to perform in the optimization of weighting
-
+        defaults(end+1,:) = {'numIterOpt', 'nonnegative', 10};     % The number of iterations to perform in the optimization of weighting
+        defaults(end+1,:) = {'normalizeToOne', 'boolean', false};   % Normalize the scale factors to 1?
     end    
     
     % -------------------------------------------------------------------------

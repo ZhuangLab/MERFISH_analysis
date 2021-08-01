@@ -74,6 +74,10 @@ defaults(end+1,:) = {'areaBins', ...                    % The histogram bins for
 defaults(end+1,:) = {'blankFnc', 'function', ...        % Function to identify blank controls in codebook
     @(x)~isempty(regexp(x, 'Blank-', 'once'))};
 
+% Parameters for barcode density report                 % The size of 2D histogram bins in pixels
+defaults(end+1,:) = {'barcodeDensityBinSize', ...
+    'nonnegative', 20};
+
 % Parameters for SaveFigure
 defaults(end+1,:) = {'overwrite', 'boolean', true};     % Options for SaveFigure
 defaults(end+1,:) = {'formats', 'cell', {'png', 'fig'}}; 
@@ -191,6 +195,11 @@ else
 end
 
 % ------------------------------------------------------------------------
+% Load the mDecoder
+%-------------------------------------------------------------------------
+mDecoder = MERFISHDecoder.Load(normalizedDataPath);
+
+% ------------------------------------------------------------------------
 % Load and compile data either via different methods for handling different
 % 'cells'
 %-------------------------------------------------------------------------
@@ -227,6 +236,9 @@ switch parameters.cellIDMethod
         % Define the number of cells
         numCells = length(cellBoundaries);
         
+        % Define the y-labels for plot below
+        FPKMCorrYLabel = 'Counts/Cell';
+        
     case 'fov'
         % Define path to barcodes for each fov
         bListPath = [parameters.barcodePath filesep 'barcode_fov' filesep];
@@ -244,10 +256,16 @@ switch parameters.cellIDMethod
         % Define properties for iteration
         numObjects = length(foundFiles);
         numCells = length(foundFiles);
-end
+        
+        % Define the y-labels for plot below
+        FPKMCorrYLabel = 'Counts/FOV';
+
+end    
+
 
 % Load and process blocks of barcodes or barcodes by fov in parallel
 spmd (numPar)
+
     % Define local variables for accumulation per worker
     countsPerCellExact = zeros(numBarcodes, numCells);
     countsPerCellCorrected = zeros(numBarcodes, numCells);
@@ -262,6 +280,9 @@ spmd (numPar)
     distToNucleusInNucleus = zeros(numBarcodes, numCells); % Average distance per RNA to nucleus if the RNA is inside the nucleus
     fractionInNucleus = zeros(numBarcodes, numCells); % Fraction of RNAs inside the nucleus
 
+    barcodeDensity = zeros(length(1:parameters.barcodeDensityBinSize:mDecoder.imageSize(1)), ... % Histogram of barcode density per fov
+        length(1:parameters.barcodeDensityBinSize:mDecoder.imageSize(2)), mDecoder.numZPos);  % The histogram will be calculated for all z positions individually
+    
     % Loop over a set of blocks per worker
     for b=labindex:numlabs:numObjects
         % Display progress
@@ -343,30 +364,24 @@ spmd (numPar)
 
         displayStrings{end+1} = (['Computed errors in ' num2str(toc(histogramTimer)) ' s']); 
 
-        %%% UNDER CONSTRUCTION
-%         if strcmp(parameters.cellIDMethod, 'cellID')
-%             % Accumulate distances
-%             distanceTimer = tic;
-%             for j=1:numBarcodes
-%                 % Accumulate barcodes outside of the nucleus
-%                 localInds = [aList.inNucleus] == 0 & [aList.barcode_id] == j;
-%                 if any(localInds)
-%                     distToNucleusOutNucleus(j,:) = distToNucleusOutNucleus(j,:) + accumarray([aList(localInds).cellID]', [aList(localInds).distNucleus], [numCells 1], @sum)';
-%                 end
-% 
-%                 % Accumulate barcodes within the nucleus
-%                 localInds = [aList.inNucleus] == 1 & [aList.barcode_id] == j;
-%                 if any(localInds)
-%                     distToNucleusInNucleus(j,:) = distToNucleusInNucleus(j,:) + accumarray([aList(localInds).cellID]', [aList(localInds).distNucleus], [numCells 1], @sum)';
-% 
-%                     % Accumulate number within the nucleus
-%                     fractionInNucleus(j,:) = fractionInNucleus(j,:) + accumarray([aList(localInds).cellID]', 1, [numCells 1], @sum)';
-%                 end
-%             end
-%             displayStrings{end+1} = (['Accumulated distances in ' num2str(toc(distanceTimer)) ' s']); 
-% 
-%         end
-
+        % Accumulate the barcode density as a function of location
+        densityTimer = tic;
+    
+        barcodeCenter = cat(1, aList.weighted_pixel_centroid); % Extract the centers of all barcodes
+        % Build a list of z indices for all barcodes
+        if size(barcodeCenter,2) == 3
+            zInds = discretize(barcodeCenter(:,3), [1:mDecoder.numZPos inf]);
+        else
+            zInds = ones(1, size(barcodeCenter,1));
+        end
+        for z=1:mDecoder.numZPos
+            barcodeDensity(:,:,z) = barcodeDensity(:,:,z) + hist3(barcodeCenter(zInds == z,1:2), ...
+                'Edges', {1:parameters.barcodeDensityBinSize:mDecoder.imageSize(1), ...
+                1:parameters.barcodeDensityBinSize:mDecoder.imageSize(2)});
+        end
+        
+        displayStrings{end+1} = (['Computed barcode density in ' num2str(toc(densityTimer)) ' s']); 
+        
         % Display complete progress
         disp(char(displayStrings));
 
@@ -424,6 +439,12 @@ for i=2:length(fractionInNucleus)
     temp = temp + fractionInNucleus{i};
 end
 fractionInNucleus = temp;
+
+temp = barcodeDensity{1};
+for i=2:length(barcodeDensity)
+    temp = temp + barcodeDensity{i};
+end
+barcodeDensity = temp;
 disp(['...completed in ' num2str(toc(timer)) ' s']);
 
 disp(['Completed compiling performance statistics at ' datestr(now)]);
@@ -471,6 +492,11 @@ disp(['...wrote ' parameters.outputPath 'numOne2Zero.csv']);
 
 csvwrite([parameters.outputPath 'brightnessAreaHist.csv'], brightnessAreaHist);
 disp(['...wrote ' parameters.outputPath 'brightnessAreaHist.csv']);
+
+for z=1:size(barcodeDensity,3) % Write all of the z position densities separately
+    csvwrite([parameters.outputPath 'barcodeDensity-' num2str(z) '.csv'], barcodeDensity);
+    disp(['...wrote ' parameters.outputPath 'barcodeDensity-' num2str(z) '.csv']);
+end
 
 if strcmp(parameters.cellIDMethod, 'cellID')
     csvwrite([parameters.outputPath 'distToNucleusInNucleus.csv'], distToNucleusInNucleus);
@@ -526,13 +552,57 @@ plot((parameters.areaThreshold-0.5)*[1 1], ylim, '--',  'Color', [0.75 0.75 0.75
 SaveFigure(figHandle, 'parameters', parameters, 'savePath', parameters.outputPath);
 close(figHandle);
 
+
+% -------------------------------------------------------------------------
+% Create barcode density report
+%--------------------------------------------------------------------------
+% Create separate reports for all z planes
+for z=1:size(barcodeDensity,3)
+    figHandle = figure('Name', ['Barcode density z ' num2str(z)], 'Color', 'w', ...
+        'visible', parameters.visibleOption, 'Position', [1 1 1000 1000]);
+
+    % Plot the density
+    imagesc('XData', 1:parameters.barcodeDensityBinSize:mDecoder.imageSize(2), ...
+        'YData', 1:parameters.barcodeDensityBinSize:mDecoder.imageSize(1), ...
+        'CData', barcodeDensity(:,:,z))
+    xlim([1 mDecoder.imageSize(2)]);
+    ylim([1 mDecoder.imageSize(1)]);
+    xlabel('X Position (pixels)');
+    ylabel('Y Position (pixels)');
+    cb = colorbar;
+    cb.Label.String = 'Number';
+
+    % Save figure
+    SaveFigure(figHandle, 'parameters', parameters, 'savePath', parameters.outputPath);
+    close(figHandle);
+end
+
+% Create a combined report 
+figHandle = figure('Name', ['Barcode density'], 'Color', 'w', ...
+    'visible', parameters.visibleOption, 'Position', [1 1 1000 1000]);
+
+% Plot the density
+imagesc('XData', 1:parameters.barcodeDensityBinSize:mDecoder.imageSize(2), ...
+    'YData', 1:parameters.barcodeDensityBinSize:mDecoder.imageSize(1), ...
+    'CData', sum(barcodeDensity,3))
+xlim([1 mDecoder.imageSize(2)]);
+ylim([1 mDecoder.imageSize(1)]);
+xlabel('X Position (pixels)');
+ylabel('Y Position (pixels)');
+cb = colorbar;
+cb.Label.String = 'Number';
+
+% Save figure
+SaveFigure(figHandle, 'parameters', parameters, 'savePath', parameters.outputPath);
+close(figHandle);
+
 % -------------------------------------------------------------------------
 % Create FPKM correlation plot
 %--------------------------------------------------------------------------
 if ~isempty(parameters.abundDataPath) % Check for FPKM data
     % Create figure handle
     figHandle = figure('Name', 'FPKM correlation', 'Color', 'w', ...
-        'visible', parameters.visibleOption, 'Position', [1 1 996 672]);
+        'visible', parameters.visibleOption, 'Position', [1 1 1000 667]);
 
     % Sort codebook and abundance data to match names
     [~, sortIndBarcodes, sindB] = intersect(geneNames, {abundData.geneName});
@@ -543,21 +613,25 @@ if ~isempty(parameters.abundDataPath) % Check for FPKM data
     nA = mean(countsPerCellExact,2);
     nA1 = nA(sortIndBarcodes); % Sort to FPKM data
     goodInds = nA1' > 0 & sortedFPKM > 0;
-    loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
-    [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
-    title(['\rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
+    if sum(goodInds) > 2
+        loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
+        [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
+        title(['Exact: \rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
+        ylim([min(nA)*0.8 max(nA)*1.2]);
+        xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
+    end
     xlabel('FPKM');
-    ylabel('RNA / cell');
-    ylim([min(nA)*0.8 max(nA)*1.2]);
-    xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
+    ylabel(FPKMCorrYLabel);
     axis square;
 
     % Enrichment/deenrichment
     subplot(2,3,4);
-    ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
-    [~, sortInd] = sort(nA1(goodInds), 'descend');
-    plot(ratio(sortInd) - mean(ratio), '.');
-    title([num2str(std(ratio), 2)]);
+    if sum(goodInds) > 2
+        ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
+        [~, sortInd] = sort(nA1(goodInds), 'descend');
+        plot(ratio(sortInd) - mean(ratio), '.');
+        title([num2str(std(ratio), 2)]);
+    end
     xlabel('Barcode');
     ylabel('Ratio (log_{2})');
     axis square;
@@ -567,21 +641,25 @@ if ~isempty(parameters.abundDataPath) % Check for FPKM data
     nA = mean(countsPerCellCorrected,2);
     nA1 = nA(sortIndBarcodes); % Sort to FPKM data
     goodInds = nA1' > 0 & sortedFPKM > 0;
-    loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
-    [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
-    title(['\rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
+    if sum(goodInds) > 2
+        loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
+        [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
+        title(['Corrected: \rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
+        ylim([min(nA)*0.8 max(nA)*1.2]);
+        xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
+    end
     xlabel('FPKM');
-    ylabel('RNA / cell');
-    ylim([min(nA)*0.8 max(nA)*1.2]);
-    xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
+    ylabel(FPKMCorrYLabel);
     axis square;
 
     % Enrichment/deenrichment
     subplot(2,3,5);
-    ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
-    [~, sortInd] = sort(nA1(goodInds), 'descend');
-    plot(ratio(sortInd) - mean(ratio), '.');
-    title([num2str(std(ratio), 2)]);
+    if sum(goodInds)>2
+        ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
+        [~, sortInd] = sort(nA1(goodInds), 'descend');
+        plot(ratio(sortInd) - mean(ratio), '.');
+        title([num2str(std(ratio), 2)]);
+    end
     xlabel('Barcode');
     ylabel('Ratio (log_{2})');
     axis square;
@@ -591,21 +669,25 @@ if ~isempty(parameters.abundDataPath) % Check for FPKM data
     nA = mean(countsPerCellCorrected+countsPerCellExact,2);
     nA1 = nA(sortIndBarcodes); % Sort to FPKM data
     goodInds = nA1' > 0 & sortedFPKM > 0;
-    loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
-    [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
-    title(['\rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
+    if sum(goodInds) > 2
+        loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
+        [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
+        title(['All: \rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
+        ylim([min(nA)*0.8 max(nA)*1.2]);
+        xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
+    end
     xlabel('FPKM');
-    ylabel('RNA / cell');
-    ylim([min(nA)*0.8 max(nA)*1.2]);
-    xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
+    ylabel(FPKMCorrYLabel);
     axis square;
 
     % Enrichment/deenrichment
     subplot(2,3,6);
-    ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
-    [~, sortInd] = sort(nA1(goodInds), 'descend');
-    plot(ratio(sortInd) - mean(ratio), '.');
-    title([num2str(std(ratio), 2)]);
+    if sum(goodInds) > 2
+        ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
+        [~, sortInd] = sort(nA1(goodInds), 'descend');
+        plot(ratio(sortInd) - mean(ratio), '.');
+        title([num2str(std(ratio), 2)]);
+    end
     xlabel('Barcode');
     ylabel('Ratio (log_{2})');
     axis square;
@@ -614,102 +696,6 @@ if ~isempty(parameters.abundDataPath) % Check for FPKM data
     SaveFigure(figHandle, 'parameters', parameters, 'savePath', parameters.outputPath);
     close(figHandle);
 end
-
-% -------------------------------------------------------------------------
-% Create smFISH analysis result: UNDER CONSTRUCTION
-% This code will create a report based on the copy numbers per cell for
-% given RNAs
-%--------------------------------------------------------------------------
-% if ~isempty(parameters.abundDataPath) % Check for FPKM data
-%     % Create figure handle
-%     figHandle = figure('Name', 'smFISH correlation', 'Color', 'w', ...
-%         'visible', parameters.visibleOption, 'Position', [1 1 996 672]);
-% 
-%     % Find the gene names that are both in the provided abundance data and
-%     % which are non-zero (i.e. they were measured)
-%     
-%     
-%     
-%     % Sort codebook and abundance data to match names
-%     [~, sortIndBarcodes, sindB] = intersect(geneNames, {abundData.geneName});
-%     sortedFPKM = [abundData(sindB).FPKM];
-%     
-%     % Exact FPKM Correlation
-%     subplot(2,3,1);
-%     nA = mean(countsPerCellExact,2);
-%     nA1 = nA(sortIndBarcodes); % Sort to FPKM data
-%     goodInds = nA1' > 0 & sortedFPKM > 0;
-%     loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
-%     [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
-%     title(['\rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
-%     xlabel('FPKM');
-%     ylabel('RNA / cell');
-%     ylim([min(nA)*0.8 max(nA)*1.2]);
-%     xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
-%     axis square;
-% 
-%     % Enrichment/deenrichment
-%     subplot(2,3,4);
-%     ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
-%     [~, sortInd] = sort(nA1(goodInds), 'descend');
-%     plot(ratio(sortInd) - mean(ratio), '.');
-%     title([num2str(std(ratio), 2)]);
-%     xlabel('Barcode');
-%     ylabel('Ratio (log_{2})');
-%     axis square;
-% 
-%     % Corrected FPKM Correlation
-%     subplot(2,3,2);
-%     nA = mean(countsPerCellCorrected,2);
-%     nA1 = nA(sortIndBarcodes); % Sort to FPKM data
-%     goodInds = nA1' > 0 & sortedFPKM > 0;
-%     loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
-%     [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
-%     title(['\rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
-%     xlabel('FPKM');
-%     ylabel('RNA / cell');
-%     ylim([min(nA)*0.8 max(nA)*1.2]);
-%     xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
-%     axis square;
-% 
-%     % Enrichment/deenrichment
-%     subplot(2,3,5);
-%     ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
-%     [~, sortInd] = sort(nA1(goodInds), 'descend');
-%     plot(ratio(sortInd) - mean(ratio), '.');
-%     title([num2str(std(ratio), 2)]);
-%     xlabel('Barcode');
-%     ylabel('Ratio (log_{2})');
-%     axis square;
-% 
-%     % Total FPKM Correlation
-%     subplot(2,3,3);
-%     nA = mean(countsPerCellCorrected+countsPerCellExact,2);
-%     nA1 = nA(sortIndBarcodes); % Sort to FPKM data
-%     goodInds = nA1' > 0 & sortedFPKM > 0;
-%     loglog(sortedFPKM(goodInds), nA1(goodInds), '.'); hold on;
-%     [R,P] = corrcoef(log10(sortedFPKM(goodInds)), log10(nA1(goodInds)));
-%     title(['\rho_{10}: ' num2str(R(1,2),2) '; P: ' num2str(P(1,2),2)]);
-%     xlabel('FPKM');
-%     ylabel('RNA / cell');
-%     ylim([min(nA)*0.8 max(nA)*1.2]);
-%     xlim([min(sortedFPKM)*0.8 max(sortedFPKM)*1.2]);
-%     axis square;
-% 
-%     % Enrichment/deenrichment
-%     subplot(2,3,6);
-%     ratio = log2(nA1(goodInds)'./sortedFPKM(goodInds));
-%     [~, sortInd] = sort(nA1(goodInds), 'descend');
-%     plot(ratio(sortInd) - mean(ratio), '.');
-%     title([num2str(std(ratio), 2)]);
-%     xlabel('Barcode');
-%     ylabel('Ratio (log_{2})');
-%     axis square;
-% 
-%     %  Save figure
-%     SaveFigure(figHandle, 'parameters', parameters, 'savePath', parameters.outputPath);
-%     close(figHandle);
-% end
 
 % -------------------------------------------------------------------------
 % Per-bit error report

@@ -9,6 +9,13 @@ classdef Morpheus < handle
 % Copyright Presidents and Fellows of Harvard College, 2018.
 % -------------------------------------------------------------------------
 % This class handles sending email messages from various SLURM jobs
+% To configure matlab to send these emails, one must run the following
+% commands at least once (where the appropriate values are provided)
+% setpref('Internet', 'E_mail', email_account);
+% setpref('Internet', 'SMTP_Server',smpt_server);
+% setpref('Internet', 'SMTP_Username',email_username);
+% setpref('Internet', 'SMTP_Password',email_password);
+
 
 % -------------------------------------------------------------------------
 % Define properties

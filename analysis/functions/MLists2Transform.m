@@ -31,6 +31,7 @@ function [tforms, mList, residuals, inds, parameters] = MLists2Transform(refList
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
+% jeffrey.moffitt@childrens.harvard.edu
 % September 21, 2017
 %--------------------------------------------------------------------------
 % Copyright Presidents and Fellows of Harvard College, 2018.
@@ -52,7 +53,8 @@ defaults(end+1,:) = {'controlPointMethod', {'nearestNeighbor', 'kNNDistanceHisto
 defaults(end+1,:) = {'distanceWeight', 'positive', 0.25};   % The weight applied to the STD of the distances for valid control point selection
 defaults(end+1,:) = {'thetaWeight', 'positive', 0.25};      % The weight applied to the STD of the angles for valid control point selection
 defaults(end+1,:) = {'histogramEdges', 'array', -128:1:128};% The bin edges for the point different histogram
-defaults(end+1,:) = {'numNN', 'array', 10};                 % The number of nearest neighbors to compute
+defaults(end+1,:) = {'numNN', 'positive', 10};                 % The number of nearest neighbors to compute
+defaults(end+1,:) = {'pairDistTolerance','positive', 1};    % The distance threshold to find paired points after crude shift (multiples of the histogramEdges step)
 
 % Apply transformation
 defaults(end+1,:) = {'applyTransform', 'boolean', true};
@@ -184,7 +186,7 @@ for f=1:numFrames
             
             % Keep all points separated by less than the pixelation of the
             % crude shift
-            pointsToKeep = find(D <= mean(diff(parameters.histogramEdges)));
+            pointsToKeep = find(D <= parameters.pairDistTolerance*mean(diff(parameters.histogramEdges)));
 
             % Issue warnings
             if maxValue < mean(N(:)) + 2*std(N(:))

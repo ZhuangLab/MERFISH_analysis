@@ -9,6 +9,7 @@ classdef FoundFeature < handle
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
+% jeffrey.moffitt@childrens.harvard.edu
 % September 21, 2017
 %--------------------------------------------------------------------------
 % Copyright Presidents and Fellows of Harvard College, 2018.
@@ -329,6 +330,7 @@ methods
         end
                 
     end
+
     % -------------------------------------------------------------------------
     % Calculate the distance to the feature
     % -------------------------------------------------------------------------
@@ -920,6 +922,96 @@ methods
             mask(:,:,z) = imfill(localMask, 'holes');
         end
     end
+
+    % -------------------------------------------------------------------------
+    % Export the found feature to a table object 
+    % -------------------------------------------------------------------------
+    function oTable = Feature2Table(obj)
+	% Output all properties of a the feature as a table. This output functionality will eventually allow features to be saved/read from a csv format.
+	% oTable = obj.Feature2Table();
+    
+        % Determine the number of zPos
+        numZPos = length(obj(1).abs_zPos);
+
+        % Create the cell arrays for these boundaries
+        boundariesX = repmat({''}, length(obj), numZPos);
+        boundariesY = repmat({''}, length(obj), numZPos);
+
+        % Fill these items
+        uIDs = {obj.uID}';
+        featureIDs = cat(1,obj.feature_id);
+        isBrokenFlags = cat(1, obj.is_broken);
+        numJoinedFeatures = cat(1, obj.num_joined_features);
+        absVolumes = cat(1, obj.abs_volume);
+
+        fovIDs = obj.ReturnPrimaryFovID()';
+
+        % Fill the boundary cells
+        for z=1:numZPos
+            for o=1:length(obj)
+                localBoundary = obj(o).abs_boundaries{z};
+                boundaryX = cell(1, 2*size(localBoundary,1));
+%                 boundaryX(1:2:end) = arrayfun(@num2str, localBoundary(:,1), 'UniformOutput', false);
+                boundaryX(1:2:end) = cellstr(num2str(localBoundary(:,1)));
+                boundaryX(2:2:end) = repmat({';'}, [1 size(localBoundary,1)]);
+                boundariesX{o,z} = cat(2,boundaryX{:});
+                boundaryY = cell(1, 2*size(localBoundary,1));
+%                 boundaryY(1:2:end) = arrayfun(@num2str, localBoundary(:,2), 'UniformOutput', false);
+                boundaryY(1:2:end) = cellstr(num2str(localBoundary(:,2)));
+                boundaryY(2:2:end) = repmat({';'}, [1 size(localBoundary,1)]);
+                boundariesY{o,z} = cat(2,boundaryY{:});
+            end
+        end
+        
+        % Create the table
+        oTable = table();
+        
+        % Add metadata
+        oTable.feature_uID = uIDs;
+        oTable.feature_ID = featureIDs;
+        oTable.fovID = fovIDs;
+        oTable.is_broken = isBrokenFlags;
+        oTable.num_joined_features = numJoinedFeatures;
+        oTable.abs_volume = absVolumes;
+        
+        % Add boundaries
+        for z=1:numZPos
+            oTable.(['abs_x_boundary_' num2str(z)]) = boundariesX(:,z);
+            oTable.(['abs_y_boundary_' num2str(z)]) = boundariesY(:,z);
+        end
+    end
+    
+    
+%         % Create an empty table
+%         oTable = table();
+%         
+%         % Add the uID
+%         oTable.feature_uID = obj.uID;
+%         
+%         % Add the feature id
+%         oTable.feature_iD = obj.feature_id;
+%         
+%         % Add feature metadata
+%         oTable.fovID = obj.fovID(1);        % Primary fov ID
+%         oTable.is_broken = obj.is_broken;
+%         oTable.num_joined_features = obj.num_joined_features;
+%         oTable.abs_volume = obj.abs_volume;
+%         
+%         % Add properties of the boundaries: 
+%         zPos = obj.abs_zPos;
+%         
+%         for z=1:length(zPos)
+%             localBoundary = obj.abs_boundaries{z};
+%             boundaryX = cell(1, 2*size(localBoundary,1));
+%             boundaryX(1:2:end) = arrayfun(@num2str, localBoundary(:,1), 'UniformOutput', false);
+%             boundaryX(2:2:end) = repmat({';'}, [1 size(localBoundary,1)]);
+%             oTable.(['abs_x_boundary_' num2str(z)]) = {cat(2, boundaryX{:})};
+%             boundaryY = cell(1, 2*size(localBoundary,1));
+%             boundaryY(1:2:end) = arrayfun(@num2str, localBoundary(:,2), 'UniformOutput', false);
+%             boundaryY(2:2:end) = repmat({';'}, [1 size(localBoundary,1)]);
+%             oTable.(['abs_y_boundary_' num2str(z)]) = {cat(2, boundaryY{:})};
+%         end
+        
 end
 
 
