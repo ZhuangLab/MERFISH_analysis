@@ -19,6 +19,7 @@ classdef Transcriptome < handle
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
+% jeffrey.moffitt@childrens.harvard.edu
 % April 27, 2015
 %--------------------------------------------------------------------------
 % Copyright Presidents and Fellows of Harvard College, 2016.
@@ -36,6 +37,7 @@ properties
     abundPath           % The path to the abundance data file
     abundLoaded         % A boolean that determines if abundance data are loaded
     transPath           % The path to the transcriptome file, if provided
+    version = '0.2'     % Version of the transcriptome object
 end
 
 properties (Hidden=true, SetAccess=protected)
@@ -45,6 +47,8 @@ properties (Hidden=true, SetAccess=protected)
     abundance           % Abundance value for each entry, if loaded
     id2Ind              % A map for conversion of ID to internal index
     name2Ind            % A map for converstion of gene name to internal index
+    cds                 % A Nx2 array of the start and stop places of a cds. -1 -1 if no CDS exists
+    idVersion           % A version number for the transcripts
 end
 
 % -------------------------------------------------------------------------
@@ -61,6 +65,7 @@ methods
         % obj = Transcriptome(..., 'abundPath', pathToAbundanceFile)
         % obj = Transcriptome(..., 'verbose', true/false);
         % obj = Transcriptome({ids, geneNames, sequences, abund}, ...) %
+        % obj = Transcriptome({ids, geneNames, sequences, abund, cds}, ...) %
        
         % -------------------------------------------------------------------------
         % Default variables
@@ -69,7 +74,7 @@ methods
         
         defaults(end+1,:) = {'verbose', 'boolean', false}; % Display progress of construction
         defaults(end+1,:) = {'headerType', {'cufflinks', 'ensembl', 'custom'}, 'cufflinks'}; % Assume a cufflinks format
-        defaults(end+1,:) = {'IDType', 'string', 'NCBI'}; % The type of transcript ID, e.g. ENSEMBL or NCBI. 
+        defaults(end+1,:) = {'IDType', 'string', ''}; % The type of transcript ID, e.g. ENSEMBL or NCBI. 
         defaults(end+1,:) = {'abundPath', 'filePath', []}; % Path to abundance data
         
         % -------------------------------------------------------------------------
@@ -116,15 +121,22 @@ methods
             if ~isempty(setdiff({'Header', 'Sequence'}, fields(transcriptome)))
                 error('matlabFunctions:invalidArguments', 'Provided structure does not have all required fields');
             end
-        elseif iscell(transcriptome) && length(transcriptome) == 4 % All data were provided in a cell
-            % Insert everything (but sequences)
+        elseif iscell(transcriptome) && (length(transcriptome) >= 3) % Data provided in the cell in this format
+            %{ids, geneNames, seqs, abundance(optional), cds (optional), idVersions (optional)}|
+                        
+            % Insert ids and gene names and cds and idVersion info
             obj.ids = transcriptome{1};
             obj.geneNames = transcriptome{2};
-            obj.abundance = transcriptome{4};
-            obj.abundLoaded = false;
-            % Update abundance loaded flag
-            if ~isempty(obj.abundance)
+            
+            % Insert abundances if provided
+            if length(transcriptome) > 3
+                obj.abundance = transcriptome{4};
                 obj.abundLoaded = true;
+                if isempty(obj.abundance)
+                    obj.abundLoaded = false;
+                end
+            else
+                obj.abundLoaded = false;
             end
            
             % Check sequences for integer versus character
@@ -134,6 +146,19 @@ methods
             else
                 obj.intSequences = transcriptome{3};
             end
+            
+            % Handle the case that no cds was provided
+            if length(transcriptome) < 5
+                transcriptome{5} = -1*ones(length(transcriptome{1}),2);
+            end
+            obj.cds = transcriptome{5};
+            
+            % Handle the case that no idVersions was provided
+            if length(transcriptome) < 6
+                transcriptome{6} = repmat({''}, [length(transcriptome{1}) 1]);
+            end
+            obj.idVersion = transcriptome{6};
+            
         else
             error('matlabFunctions:invalidArguments', 'Invalid input');
         end
@@ -149,18 +174,37 @@ methods
             end
             switch obj.headerType
                 case 'cufflinks'
-                    parseFunc = @(x)regexp(x, '(?<id>\S*) (?<name>gene=\S*)', 'names');
+					parseFunc = @(x)regexp(x,'(?<id>\S*) (?<name>gene=\S*)' , 'names');
                     for i=1:length(transcriptome)
+                        % Parse the header
                         parsedData = parseFunc(transcriptome(i).Header);
-                        obj.ids{i} = parsedData.id;
                         obj.geneNames{i} = parsedData.name(6:end); % Strip off gene=
                         obj.intSequences{i} = int8(nt2int(transcriptome(i).Sequence)) - 1; % 0=A, 1=C, ... >3 = not valid
+                        obj.ids{i} = parsedData.id(1:end);
+
+                        % Handle a transcript version if available;
+                        t_version = regexp(transcriptome(i).Header,'transcript_version=\S*', 'match');
+						if isempty(t_version)
+                            obj.idVersion{i} = '';
+                        else
+                            obj.idVersion{i} = t_version{1}(20:end);
+						end
+						
+                        % Add cds infomation if availablesort cds index
+                        CDS_transcr = regexp(transcriptome(i).Header,'(CDS=\S*)', 'match');
+						if ~isempty (CDS_transcr)	
+						    cds_index = regexp(CDS_transcr, '(?<first>\d+)-(?<second>\d+)','names');
+							obj.cds(i,:) = cat(2, str2num(cds_index{1}.first), str2num(cds_index{1}.second));
+                        else
+                            obj.cds(i,:) = [-1 -1]; % Flag that no CDS was available
+                        end
+							
                     end
                 case 'ensembl'
                     parseFunc = @(x)regexp(x, '(?<id> gene:\S*)', 'names');
                     for i=1:length(transcriptome)
                         parsedData = parseFunc(transcriptome(i).Header);
-                        obj.ids{i} = parsedData.id(7:end);
+						obj.ids{i} = parsedData.id(7:end);
                         obj.geneNames{i} = ''; % Gene name not provided in header
                         obj.intSequences{i} = int8(nt2int(transcriptome(i).Sequence)) - 1;
                     end
@@ -170,6 +214,73 @@ methods
             end
         end
 
+        % -------------------------------------------------------------------------
+        % Set abundances
+        % -------------------------------------------------------------------------
+        if isempty(obj.abundance)
+            if ~isempty(parameters.abundPath)
+                obj.AddAbundances(parameters.abundPath)
+            else
+                obj.abundance = ones(1, obj.numTranscripts); % Updated from zeros to equal weighting of 1
+            end
+        end
+        
+        % Update the internal storage/indexing
+        obj.UpdateInternalIndexing();
+    end
+    
+    
+    % -------------------------------------------------------------------------
+    % Add entry
+    % -------------------------------------------------------------------------
+    function AddEntries(obj, names, ids, seqs, abunds, cds, idVersions)
+        % Add entries to the transcriptome object after it is created
+        % obj.AddEntries({name1, ...}, {id1, ...}, {seq1, ...}, [abund1 ...])
+        % obj.AddEntries({name1, ...}, {id1, ...}, {seq1, ...}, [abund1 ...], [cds1_start cds1_end; ...])
+        % obj.AddEntries({name1, ...}, {id1, ...}, {seq1, ...}, [abund1 ...], [cds1_start cds1_end; ...], {idVersion1, ...})
+        
+        % 
+        if obj.verbose
+            display('Adding sequences');
+        end
+        
+        % Handle backwards compatibility for no provided idVersions
+        if nargin < 7
+            idVersions = repmat({''}, [1 length(names)]);
+        end
+
+        % Handle backwards compatibility for no provided cds
+        if nargin < 6
+            cds = -1*ones(length(abunds), 2);
+        end
+        
+        % Convert sequences to integer representation
+        intSeqs = cellfun(@(x)int8(nt2int(x)) - 1, seqs, 'UniformOutput', false);
+        
+        % Append new values to the end of the existing values
+        obj.ids = cat(2, obj.ids, ids);
+        obj.geneNames = cat(2, obj.geneNames, names);
+        obj.abundance = cat(2, obj.abundance, abunds); 
+        obj.intSequences = cat(2, obj.intSequences, intSeqs);
+        obj.cds = cat(1, obj.cds, cds);
+        obj.idVersion = cat(2, obj.idVersion, idVersions);
+        
+        % Update the internal storage/indexing
+        obj.UpdateInternalIndexing();
+        
+        if obj.verbose
+            disp(['Added ' num2str(length(names)) ' sequences']);
+        end
+
+    end
+        
+    % -------------------------------------------------------------------------
+    % UpdateInternalIndexing
+    % -------------------------------------------------------------------------
+    function UpdateInternalIndexing(obj)
+        % Update the internal indexing of the transcriptome object
+        % obj.UpdateInternalIndexing()
+        
         % -------------------------------------------------------------------------
         % Build internal index maps: ID to index
         % -------------------------------------------------------------------------
@@ -187,16 +298,6 @@ methods
         obj.name2Ind = containers.Map(geneNames, isoFormInds);
         obj.numGenes = length(geneNames);
         
-        % -------------------------------------------------------------------------
-        % Set abundances
-        % -------------------------------------------------------------------------
-        if isempty(obj.abundance)
-            if ~isempty(parameters.abundPath)
-                obj.AddAbundances(parameters.abundPath)
-            else
-                obj.abundance = zeros(1, obj.numTranscripts);
-            end
-        end
     end
 
     % -------------------------------------------------------------------------
@@ -275,6 +376,11 @@ methods
         % abund = obj.GetAbundanceByID(ids)
         % ids not in the transcriptome are returned as Nan
 
+        % Check for single entry that is not a cell
+        if ~iscell(ids)
+            ids = {ids};
+        end
+        
         validKeys = isKey(obj.id2Ind, ids);
         abund = nan(1, length(ids));
         keys = obj.id2Ind.values(ids(validKeys));
@@ -407,7 +513,52 @@ methods
             seqs = seqs{1};
         end
     end
+    
+    % -------------------------------------------------------------------------
+    % CDSByID: Return CDS values
+    % -------------------------------------------------------------------------
+    function cdsValues = CDSByID(obj, ids)
+        % Return CDS values for each id
+        % cdsValues = CDSByID(ids)
+        
+        % Handle a single input
+        if ~iscell(ids)
+            ids = {ids}; 
+        end
 
+        % Create sequences cell array
+        cdsValues = -1*ones(length(ids),2);
+
+        % Find valid names
+        isValid = isKey(obj.id2Ind, ids);
+
+        cdsValues(isValid,:) = obj.cds(cell2mat(values(obj.id2Ind, ids(isValid))),:);
+                
+    end
+    
+    % -------------------------------------------------------------------------
+    % GetIDVersion: Return id version values
+    % -------------------------------------------------------------------------
+    function versions = GetIDVersion(obj, ids)
+        % Return version identifier for each id
+        % versions = GetIDVersion(obj, ids)
+        
+        % Handle a single input
+        if ~iscell(ids)
+            ids = {ids}; 
+        end
+
+        % Create sequences cell array
+        versions = repmat({''}, [1 length(ids)]);
+
+        % Find valid names
+        isValid = isKey(obj.id2Ind, ids);
+
+        versions(isValid) = obj.idVersion(cell2mat(values(obj.id2Ind, ids(isValid))));
+                
+    end
+
+    
     % -------------------------------------------------------------------------
     % GetIDsByName: Return gene ids by gene name(s)
     % -------------------------------------------------------------------------
@@ -416,12 +567,14 @@ methods
         % ids = obj.GetIDsByName(names)
         
         % Coerce input to cell
+        madeCell = false;
         if ~iscell(names)
             names = {names};
+            madeCell = true;
         end
         
         % Prepare output: empty cells indicates invalid names
-        ids = cell(0, length(names));
+        ids = cell(1, length(names));
 
         % Identify valid names
         validKeys = isKey(obj.name2Ind, names);
@@ -433,6 +586,12 @@ methods
                 ids{validKeys(i)} = obj.ids(inds{i});
             end
         end
+        
+        % If the input was a single name, unzip the ids
+        if madeCell
+            ids = ids{1};
+        end
+        
     end
     
     % -------------------------------------------------------------------------
@@ -523,7 +682,7 @@ methods
         % -------------------------------------------------------------------------
         fieldsToSave = properties(obj);
         fieldsToSave = union(fieldsToSave, {'ids', 'geneNames', ...
-            'intSequences', 'abundance', 'id2Ind', 'name2Ind'});
+            'intSequences', 'abundance', 'id2Ind', 'name2Ind', 'cds', 'idVersion'});
     
         % -------------------------------------------------------------------------
         % Save fields
@@ -643,8 +802,13 @@ methods (Static)
         % Define fields to load
         % -------------------------------------------------------------------------
         fieldsToLoad = properties(obj);
+
         fieldsToLoad = union(fieldsToLoad, {'ids', 'geneNames', ...
             'intSequences', 'abundance', 'id2Ind', 'name2Ind'});
+        
+        % Handle version by always up-converting
+        fieldsToLoad = setdiff(fieldsToLoad, {'version'});
+        
         % -------------------------------------------------------------------------
         % Load properties/data
         % -------------------------------------------------------------------------
@@ -652,6 +816,24 @@ methods (Static)
             obj.(fieldsToLoad{i}) = LoadByteStream([dirPath fieldsToLoad{i} '.matb'], ...
             'verbose', parameters.verbose);
         end
+        
+        % -------------------------------------------------------------------------
+        % Handle backwards compatibility for cds info
+        % -------------------------------------------------------------------------
+        if exist([dirPath 'cds.matb'])
+           obj.cds = LoadByteStream([dirPath 'cds.matb']);
+        else
+           warning('Transcriptome object is an older version without cds information');
+           obj.cds = -1*ones(obj.numTranscripts, 2);
+        end
+        if exist([dirPath 'idVersion.matb'])
+           obj.idVersion = LoadByteStream([dirPath 'idVersion.matb']);
+        else
+           warning('Transcriptome object is an older version without id version information');
+           obj.idVersion = repmat({''}, [1 obj.numTranscripts]);
+        end
+        
+        
     end
 end
 

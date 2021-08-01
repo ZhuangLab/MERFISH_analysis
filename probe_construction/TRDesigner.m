@@ -7,6 +7,7 @@ classdef TRDesigner < handle
 %--------------------------------------------------------------------------
 % Jeffrey Moffitt
 % lmoffitt@mcb.harvard.edu
+% jeffrey.moffitt@childrens.harvard.edu
 % April 2018
 %--------------------------------------------------------------------------
 % Copyright Presidents and Fellows of Harvard College, 2018.
@@ -41,6 +42,8 @@ properties (SetAccess=protected)
     
     isoSpecificity          % The fraction of each sequence that is unique to the isoforms of that gene
     isoSpecificityTables    % An array of OTTables used to calculate isoform specificity
+    
+    alwaysDefinedSpecificity % Whether ill-defined specificities (0/0) are set to 1 or left ill-defined
 end
 
 % -------------------------------------------------------------------------
@@ -60,6 +63,7 @@ methods
         % obj = TRDesigner(..., 'forbiddenSeqs', {seq1, seq2, ...});
         % obj = TRDesigner(..., 'specificityTable', OTTableObj);
         % obj = TRDesigner(..., 'isoSpecificityTables', OTTableObjArray);
+        % obj = TRDesigner(..., 'alwaysDefinedSpecificity', boolean);
         
         % -------------------------------------------------------------------------
         % Parse variable inputs
@@ -74,7 +78,8 @@ methods
         defaults(end+1,:) = {'forbiddenSeqs', 'cell', {}};
         defaults(end+1,:) = {'specificityTable', 'freeType', []};
         defaults(end+1,:) = {'isoSpecificityTables', 'freeType', []};
-
+        defaults(end+1,:) = {'alwaysDefinedSpecificity', 'boolean', false}; % Maintain backwards compatability
+        
         % Parse variable input
         parameters = ParseVariableArguments(varargin, defaults, mfilename);
         
@@ -397,6 +402,22 @@ methods
                 if obj.verbose && ~mod(s,1000)
                     display(['... completed ' num2str(s) ' seqs']);
                 end
+            end
+        end
+        
+        % -------------------------------------------------------------------------
+        % Handle ill-defined specificity values
+        % -------------------------------------------------------------------------
+        if obj.alwaysDefinedSpecificity
+            if obj.verbose
+                disp(['... setting all ill-defined specificity values to 1']);
+            end
+            
+            % Loop over specificity values
+            for s=1:length(obj.specificity)
+                localSpecificity = obj.specificity{s};
+                localSpecificity(isnan(localSpecificity)) = 1;
+                obj.specificity{s} = localSpecificity;
             end
         end
         
@@ -1044,19 +1065,30 @@ methods (Static)
     % -------------------------------------------------------------------------
     % Build a TRDesigner object from a saved version
     % -------------------------------------------------------------------------
-    function obj = Load(dirPath)
+    function obj = Load(dirPath, varargin)
         % obj = TRDesigner.Load(dirPath)
-        
+        % obj = TRDesigner.Load(dirPath, 'lightweight', true/false)
+                
         % -------------------------------------------------------------------------
         % Check provided path
         % -------------------------------------------------------------------------
         if dirPath(end) ~= filesep
             dirPath(end+1) = filesep;
         end
-        if ~isdir(dirPath)
+        if ~isfolder(dirPath)
             error('matlabFunctions:invalidArguments', 'The provided path is not valid');
         end
         
+        % -------------------------------------------------------------------------
+        % Parse variable inputs
+        % -------------------------------------------------------------------------
+        % Define defaults
+        defaults = cell(0,3); 
+        defaults(end+1,:) = {'lightweight', 'boolean', false}; % Load only elements needed for TRDesign?
+        
+        % Parse variable input
+        parameters = ParseVariableArguments(varargin, defaults, mfilename);
+
         % -------------------------------------------------------------------------
         % Create empty object (to define fields to load)
         % -------------------------------------------------------------------------
@@ -1066,6 +1098,16 @@ methods (Static)
         % Define fields to load
         % -------------------------------------------------------------------------
         fieldsToLoad = setdiff(properties(obj), {'parallel', 'numPar'});
+        
+        % Remove fields for the lightweight option if requested
+        if parameters.lightweight
+            disp(['Loading a lightweight version. The following attributes will not be available']);
+            fieldsToExclude = {'specificityTable', 'isoSpecificityTables'};
+            fieldsToLoad = setdiff(fieldsToLoad, fieldsToExclude);
+            for F=1:length(fieldsToExclude)
+                disp(['...' fieldsToExclude{F}]);
+            end
+        end
         
         % -------------------------------------------------------------------------
         % Load properties/data
@@ -1088,6 +1130,12 @@ methods (Static)
                     obj.isoSpecificityTables = OTTable.Load([dirPath 'isoSpecificityTables']);
                 case 'transcriptome'
                     obj.transcriptome = Transcriptome.Load([dirPath 'transcriptome']);
+                case 'alwaysDefinedSpecificity'
+                    if exist([dirPath 'alwaysDefinedSpecificity.matb'], 'file')
+                        obj.alwaysDefinedSpecificity = LoadByteStream([dirPath 'alwaysDefinedSpecificity.matb']);
+                    else
+                        obj.alwaysDefinedSpecificity = false;
+                    end
                 otherwise
                     obj.(fieldsToLoad{i}) = LoadByteStream([dirPath fieldsToLoad{i} '.matb'], ...
                     'verbose', true);
