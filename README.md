@@ -41,6 +41,7 @@ Several example scripts are provided to illustrate how to perform a series of ba
 The functions and example scripts associated with the older pipeline are still available but have been moved to folders named 'deprecated'. 
 2. (September 2018) The MERFISH analysis pipeline has been updated to allow massively parallel computing on clusters running the SLURM scheduling system. Improved cell segmentation functionality has been added. 
 The functions and example scripts associated with older pipelines can be found in folders named 'deprecated'.
+3. (August 2021) Minor updates to target region design and decoding pipelines.
 
 ## Questions
-Contact Xiaowei Zhuang (zhuang at chemistry.harvard.edu) or Jeffrey Moffitt (lmoffitt at mcb.harvard.edu).
+Contact Xiaowei Zhuang (zhuang at chemistry.harvard.edu) or Jeffrey Moffitt (lmoffitt at mcb.harvard.edu or jeffrey.moffitt at childrens.harvard.edu).
