@@ -14,7 +14,7 @@ Details concerning the licensing of this software for commercial purposes can be
 This software requires the following software packages.
 
 1. [matlab-storm](https://github.com/ZhuangLab/matlab-storm): A set of matlab functions for the analysis and visualization of storm-data.
-2. [storm-analysis](https://github.com/ZhuangLab/storm-analysis): A collection of STORM analysis functions, primarily in Python.
+2. [storm-analysis](https://github.com/MoffittLab/storm-analysis): A collection of STORM analysis functions, primarily in Python. Note that the software in this repository uses an older, archived version of this code. For reference, the newest storm-analysis is [here](https://github.com/ZhuangLab/storm-analysis). 
 3. [export-fig](https://github.com/altmany/export_fig): A figure export package for Matlab. 
 4. Matlab.
 5. Python 2.7 (Only for storm-analysis)
